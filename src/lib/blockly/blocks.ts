@@ -1552,7 +1552,7 @@ export const blocks = [
                 options: [
                     ['%', '%'],
                     ['cm', 'cm'],
-                    ['in', 'in']
+                    ['in', 'inches']
                 ]
             },
             {
@@ -2898,7 +2898,7 @@ export const blocks = [
                 name: 'UNIT',
                 options: [
                     ['cm', 'cm'],
-                    ['in', 'in']
+                    ['in', 'inches']
                 ]
             },
             {
@@ -3172,7 +3172,7 @@ export const blocks = [
                 options: [
                     ['%', '%'],
                     ['cm', 'cm'],
-                    ['in', 'in']
+                    ['in', 'inches']
                 ]
             },
             {
@@ -3299,7 +3299,7 @@ export const blocks = [
                 options: [
                     ['%', '%'],
                     ['cm', 'cm'],
-                    ['in', 'in']
+                    ['in', 'inches']
                 ]
             },
             {
