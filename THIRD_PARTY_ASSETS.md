@@ -16,4 +16,6 @@ Upstream README links [DrivingBase3.mpd](https://ahfiles.s3.amazonaws.com/robots
 
 ## New preview assets
 
+`src/lab/advancedRig.ts` creates original simplified ADB-style geometry from code, inspired by the user's reference image; it contains no imported LEGO/LDraw mesh data and is not a verified reconstruction. Its parts, decorative hub matrix, C/D tools and sensor housings are illustrative. See [ROBOT_MODEL.md](ROBOT_MODEL.md). Existing upstream licenses and notices remain in place.
+
 `static/lab-icon.svg` and the generated practice grid/cylinder are created for this fork. The bundled `static/samples/new-code-blocks.json` is extracted from the user's supplied exploratory LEGO project. It is not a demonstrated successful driving program. Google Fonts are requested by the stylesheet; program data is not included in those requests.

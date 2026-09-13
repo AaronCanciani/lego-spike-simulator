@@ -1,6 +1,6 @@
 # Representative sensor tests
 
-Run `npm test`. As of 2026-09-13, 42 tests pass with the optional reference model installed. These are software-model tests, not evidence of real-robot accuracy. The existing `.llsp3` sample and Coral Nursery regressions remain part of the suite.
+Run `npm test`. As of 2026-09-13, 46 tests pass with the optional reference model installed, including the four newer [animated-model tests](ROBOT_MODEL.md). These are software-model tests, not evidence of real-robot accuracy. The existing `.llsp3` sample and Coral Nursery regressions remain part of the suite.
 
 ## Newly available browser experiments
 

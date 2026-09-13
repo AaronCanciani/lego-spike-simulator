@@ -540,7 +540,8 @@ select {
     border-radius: 6px;
     padding: 8px 10px;
 }
-.world-bottom button.active {
+.world-bottom button.active,
+.camera-tools button.active {
     border-color: #ffce44;
     color: #ffdc74;
     background: #433f32;

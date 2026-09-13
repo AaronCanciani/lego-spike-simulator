@@ -8,6 +8,7 @@
     import { colorExample, resultVariable, type ColorExperiment } from './lab/colorExamples';
     import { samplePixels } from './lab/colorSampling';
     import { courseStart } from './lab/sensorCourse';
+    import { jointExample } from './lab/jointExample';
     import { defaultSensors } from './lab/sensors';
     import { coralExample } from './lab/missionExample';
     import { coralMission, MissionMonitor } from './lab/mission';
@@ -61,8 +62,9 @@
     let mission = false,
         monitor: MissionMonitor | null = null,
         missionState = new MissionMonitor(start).snapshot();
-    let appearance = 'reference',
-        modelStatus = 'Loading reference model…';
+    let appearance = 'advanced',
+        modelStatus = 'Optional imported reference has not been loaded';
+    let followRobot = false;
     let notice = '',
         noticeTimer: ReturnType<typeof setTimeout>;
     const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
@@ -188,6 +190,22 @@
     function loadExample() {
         if (!example) return;
         mission = example.startsWith('coral');
+        if (example === 'joints') {
+            start = { x: 0, y: -100, heading: 0 };
+            if (map !== 'practice') {
+                map = 'practice';
+                mapReady = false;
+            }
+            appearance = 'advanced';
+            lastFile = null;
+            accept(jointExample(), 'Robot showcase · wheels & tools');
+            world?.robotCloseup();
+            announce(
+                'Real motor commands: drive forward/back, raise C/D tools, then lower them. Geometry is an ADB-style approximation.'
+            );
+            example = '';
+            return;
+        }
         if (example.startsWith('course-')) {
             const kind = example.slice(7) as ColorExperiment;
             profile.sensorConfig = structuredClone(defaultSensors);
@@ -420,7 +438,8 @@
                 <option value="sensor-force">Force · stop on contact</option>
                 <option value="course-red">Color · stop at red</option><option value="course-blue"
                     >Color · stop at blue</option
-                ><option value="course-line">Line · follow curve to red</option></select
+                ><option value="course-line">Line · follow curve to red</option>
+                <option value="joints">Robot · wheels & tools</option></select
             ><button
                 class="quiet"
                 disabled={busy || loading}
@@ -611,6 +630,7 @@
                     {showSensors}
                     {placing}
                     {appearance}
+                    bind:followRobot
                     motors={snapshot.motors}
                     sensors={snapshot.sensors}
                     {profile}
@@ -632,11 +652,13 @@
                                   ? 'Grid and color targets'
                                   : 'Mat + boundary walls'}</small
                         ><small title={modelStatus}
-                            >{appearance === 'cylinder'
-                                ? 'Cylinder proxy'
-                                : modelStatus.startsWith('Animated')
-                                  ? 'Reference build · not exact ADB'
-                                  : 'Cylinder · reference loading/unavailable'}</small
+                            >{appearance === 'advanced'
+                                ? 'ADB-style model · approximate assembly'
+                                : appearance === 'cylinder'
+                                  ? 'Cylinder proxy'
+                                  : modelStatus.startsWith('Animated')
+                                    ? 'Reference build · not exact ADB'
+                                    : 'ADB approximation · reference unavailable/loading'}</small
                         ></span
                     >
                     <div class="camera-tools">
@@ -646,6 +668,10 @@
                         ><button
                             title="Inspect robot and moving tools"
                             on:click={() => world.robotCloseup()}>Robot</button
+                        ><button
+                            class:active={followRobot}
+                            title="Keep the camera with the moving robot"
+                            on:click={() => (followRobot = !followRobot)}>Follow</button
                         >
                     </div>
                 </div>
@@ -764,14 +790,15 @@
         <fieldset disabled={busy}>
             <label class="field-label"
                 >Robot appearance<select bind:value={appearance}
-                    ><option value="reference">Imported reference build</option><option
-                        value="cylinder">Diagnostic cylinder</option
-                    ></select
+                    ><option value="advanced">Advanced Driving Base · approximation</option><option
+                        value="reference">Imported reference build</option
+                    ><option value="cylinder">Diagnostic cylinder</option></select
                 ></label
             >
             <p class="small-note">
-                {modelStatus}. Reference body and wheel spacing differ from the Advanced Driving
-                Base; appearance does not change physics. C/D tools are illustrative.
+                ADB-style geometry follows the configured drive-wheel diameter, track and B/F sensor
+                mounts. It is not a brick-for-brick reconstruction; C/D tools are illustrative. The
+                optional imported build is a different assembly. Appearance never changes physics. {modelStatus}.
             </p>
             <label class="field-label"
                 >Simulation profile<select bind:value={realism} on:change={setProfile}

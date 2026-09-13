@@ -4,6 +4,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { WIDTH, HEIGHT, defaultProfile } from './engine';
     import { parseReferenceRig, updateRig, disposeRig, type RobotRig } from './robotRig';
+    import { createAdvancedRig, updateAdvancedRig, type AdvancedRig } from './advancedRig';
     import { createMissionView } from './missionView';
     import { createSensorView } from './sensorView';
     import { makeSensorCourse } from './sensorCourse';
@@ -14,7 +15,8 @@
     export let showTrail = true;
     export let showSensors = false;
     export let placing = false;
-    export let appearance = 'reference';
+    export let appearance = 'advanced';
+    export let followRobot = false;
     export let motors: Record<string, { position: number }> = {};
     export let sensors: Record<string, Reading> = {};
     export let profile = defaultProfile;
@@ -22,6 +24,9 @@
     export let missionActivated = false;
     let cylinder: THREE.Group,
         reference: RobotRig | null = null;
+    let advanced: AdvancedRig;
+    let referenceRequested = false;
+    const lastRobotPosition = new THREE.Vector3(pose.x, 0, -pose.y);
     let missionView: ReturnType<typeof createMissionView>;
     let sensorView: ReturnType<typeof createSensorView>;
     const dispatch = createEventDispatcher();
@@ -43,21 +48,26 @@
         error = '';
     const textures: THREE.Texture[] = [];
     export function overhead() {
+        followRobot = false;
         camera?.position.set(0, 2450, 1);
         controls?.target.set(0, 0, 0);
         controls?.update();
     }
     export function home() {
+        followRobot = false;
         camera?.position.set(1300, 1900, 2000);
         controls?.target.set(0, 0, 0);
         controls?.update();
     }
     export function robotCloseup() {
-        camera?.position.set(pose.x + 320, 330, -pose.y + 380);
-        controls?.target.set(pose.x, 55, -pose.y);
+        followRobot = true;
+        lastRobotPosition.set(pose.x, 0, -pose.y);
+        camera?.position.set(pose.x + 320, 300, -pose.y - 380);
+        controls?.target.set(pose.x, 70, -pose.y);
         controls?.update();
     }
     async function loadReference() {
+        referenceRequested = true;
         dispatch('modelstatus', 'Loading reference model…');
         try {
             const response = await fetch('/models/DrivingBase3.mpd');
@@ -75,7 +85,9 @@
         } catch (e) {
             dispatch(
                 'modelstatus',
-                e instanceof Error ? e.message : 'Reference model unavailable; showing cylinder.'
+                e instanceof Error
+                    ? e.message
+                    : 'Reference model unavailable; showing ADB approximation.'
             );
         }
     }
@@ -247,6 +259,8 @@
             front.rotation.x = -Math.PI / 2;
             front.position.set(0, 104, -42);
             cylinder.add(front);
+            advanced = createAdvancedRig();
+            robot.add(advanced.group);
             sensorView = createSensorView();
             markers = sensorView.group;
             robot.add(markers);
@@ -254,7 +268,6 @@
             missionView = createMissionView();
             scene.add(missionView.group);
             textures.push(...missionView.textures);
-            loadReference();
             const buffer = new Float32Array(15000 * 3),
                 geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.BufferAttribute(buffer, 3));
@@ -278,7 +291,10 @@
                 frame = requestAnimationFrame(animate);
                 robot.position.set(pose.x, 0, -pose.y);
                 robot.rotation.y = (-pose.heading * Math.PI) / 180;
-                cylinder.visible = appearance === 'cylinder' || !reference;
+                cylinder.visible = appearance === 'cylinder';
+                advanced.group.visible =
+                    appearance === 'advanced' || (appearance === 'reference' && !reference);
+                if (advanced.group.visible) updateAdvancedRig(advanced, motors, profile, sensors);
                 if (reference) {
                     reference.group.visible = appearance === 'reference';
                     updateRig(reference, motors, profile);
@@ -300,6 +316,15 @@
                     trail.geometry.setDrawRange(0, Math.min(path.length, 15000));
                 }
                 controls.enabled = !placing;
+                if (followRobot) {
+                    const dx = pose.x - lastRobotPosition.x,
+                        dz = -pose.y - lastRobotPosition.z;
+                    camera.position.x += dx;
+                    camera.position.z += dz;
+                    controls.target.x += dx;
+                    controls.target.z += dz;
+                }
+                lastRobotPosition.set(pose.x, 0, -pose.y);
                 controls.update();
                 renderer.render(scene, camera);
             };
@@ -342,6 +367,7 @@
         renderer?.dispose();
     });
     $: if (mat && map !== loadedMap) setMap(map);
+    $: if (robot && appearance === 'reference' && !referenceRequested) loadReference();
 </script>
 
 <div
