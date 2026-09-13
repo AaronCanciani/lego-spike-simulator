@@ -3,6 +3,8 @@
     import { missionCatalog, wallMission, findMission } from './missionCatalog';
     import type { CompetitionSnapshot } from './competitionWorld';
     import type { TrialResult } from './reliability';
+    import { obstaclesForBoard } from './boardGeometry';
+    export let map = '';
     export let selected = '';
     export let busy = false;
     export let testing = false;
@@ -28,7 +30,7 @@
             disabled={busy}
             on:change={() => dispatch('choose')}
         >
-            <option value="">Explore mat · no mission models</option>
+            <option value="">Explore board · all available models</option>
             {#each missionCatalog as m}<option value={m.id}>{m.map} · {m.number} {m.name}</option
                 >{/each}
             <option value={wallMission.id}>Training · {wallMission.name}</option>
@@ -47,10 +49,9 @@
         </div>
         <p class="mission-objective">{mission.goal}</p>
         <small
-            >Solid walls + {state?.missions.length ?? 1} modeled mission{(state?.missions.length ??
-                1) === 1
-                ? ''
-                : 's'} from this season. Unmodeled objects in the photo remain flat.</small
+            >4 solid table walls · {state?.missions.length ?? 0} working models · {obstaclesForBoard(
+                map
+            ).length} static obstacle approximations.</small
         >
         <details bind:open={toolsOpen} class="mission-tools">
             <summary
@@ -150,6 +151,25 @@
             </details>
         </details>
     {:else}
-        <small>Select a historical mission above to add its working 3D parts.</small>
+        <small
+            >4 solid table walls · {state?.missions.length ?? 0} working models · {obstaclesForBoard(
+                map
+            ).length} static obstacle approximations. Selecting a mission changes the objective, not
+            the obstacles.</small
+        >
+    {/if}
+    {#if obstaclesForBoard(map).length}
+        <details class="mission-tools">
+            <summary>Static obstacles · model limits</summary>
+            <p>
+                These solid boxes approximate the space occupied by mission structures. They block
+                the robot and sensor rays, but do not yet move or score. Positions and dimensions
+                are approximate; gaps inside the real LEGO assemblies are not modeled. Printed lines
+                remain flat.
+            </p>
+            <ul>
+                {#each obstaclesForBoard(map) as obstacle}<li>{obstacle.name}</li>{/each}
+            </ul>
+        </details>
     {/if}
 </section>

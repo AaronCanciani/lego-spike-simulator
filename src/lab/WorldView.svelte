@@ -18,6 +18,8 @@
     import { createSensorView } from './sensorView';
     import { makeSensorCourse } from './sensorCourse';
     import { drawCargoMap } from './cargoMap';
+    import { createTableWalls, fitBoardCamera } from './boardView';
+    let boardCamera: 'home' | 'top' | null = 'home';
     import type { Reading } from './sensors';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
@@ -59,17 +61,18 @@
     const textures: THREE.Texture[] = [];
     export function overhead() {
         followRobot = false;
-        camera?.position.set(0, 2450, 1);
-        controls?.target.set(0, 0, 0);
+        boardCamera = 'top';
+        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'top'));
         controls?.update();
     }
     export function home() {
         followRobot = false;
-        camera?.position.set(1300, 1900, 2000);
-        controls?.target.set(0, 0, 0);
+        boardCamera = 'home';
+        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'home'));
         controls?.update();
     }
     export function robotCloseup() {
+        boardCamera = null;
         followRobot = true;
         lastRobotPosition.set(pose.x, 0, -pose.y);
         camera?.position.set(pose.x + 320, 300, -pose.y - 380);
@@ -77,6 +80,7 @@
         controls?.update();
     }
     export function cargoOverview() {
+        boardCamera = null;
         followRobot = false;
         camera?.position.set(600, 850, 700);
         controls?.target.set(0, 20, 65);
@@ -221,6 +225,9 @@
             camera = new THREE.PerspectiveCamera(43, 1, 10, 14000);
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
+            controls.addEventListener('start', () => {
+                boardCamera = null;
+            });
             controls.maxPolarAngle = Math.PI / 2.1;
             controls.minDistance = 500;
             controls.maxDistance = 5000;
@@ -246,13 +253,10 @@
                 new THREE.MeshStandardMaterial({ roughness: 0.95 })
             );
             mat.rotation.x = -Math.PI / 2;
-            mat.position.y = -10;
+            mat.position.y = 0;
             mat.receiveShadow = true;
             scene.add(mat);
-            box(0, 29, -HEIGHT / 2 - 13, WIDTH + 52, 78, 26, '#536276');
-            box(0, 29, HEIGHT / 2 + 13, WIDTH + 52, 78, 26, '#536276');
-            box(-WIDTH / 2 - 13, 29, 0, 26, 78, HEIGHT, '#536276');
-            box(WIDTH / 2 + 13, 29, 0, 26, 78, HEIGHT, '#536276');
+            scene.add(createTableWalls());
             const ground = new THREE.Mesh(
                 new THREE.PlaneGeometry(20000, 20000),
                 material('#162437')
@@ -318,6 +322,7 @@
                 renderer.setSize(w, h);
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();
+                if (boardCamera) controls.target.copy(fitBoardCamera(camera, boardCamera));
             });
             observer.observe(host);
             const animate = () => {

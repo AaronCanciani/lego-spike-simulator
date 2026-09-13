@@ -269,7 +269,8 @@
                 lift,
                 findMission(s.selectedMission),
                 s.missionFriction,
-                s.attachments ?? adbAttachments
+                s.attachments ?? adbAttachments,
+                s.map
             );
             map = s.map;
             profile = structuredClone(s.profile);
@@ -477,7 +478,8 @@
                 selectedMission ? null : liftEnabled ? liftConfig : null,
                 findMission(selectedMission),
                 missionFriction,
-                attachments
+                attachments,
+                map
             );
             monitor = mission ? new MissionMonitor(start) : null;
             missionState = new MissionMonitor(start).snapshot();
@@ -764,6 +766,7 @@
     function selectMap() {
         selectedMission = '';
         practiceApproach = false;
+        if (map !== 'cargo-harbor') liftEnabled = false;
         if (map !== '2024') mission = false;
         if (map === 'cargo-harbor') {
             liftEnabled = true;
@@ -1150,6 +1153,7 @@
                 >
             </div>
             <MissionPanel
+                {map}
                 running={snapshot.state === 'running'}
                 bind:selected={selectedMission}
                 {busy}
@@ -1214,7 +1218,7 @@
                     on:error={(e) => (error = e.detail)}
                 />
                 <div class="world-top">
-                    <span class="field-tag"
+                    <span class="field-tag" class:compact={!snapshot.manipulation}
                         >{map === 'cargo-harbor'
                             ? 'CARGO HARBOR · MISSION 01'
                             : snapshot.manipulation

@@ -250,7 +250,8 @@ export class Engine {
         lift: LiftConfig | null = null,
         mission: MissionDefinition | null = null,
         missionFriction = 0.45,
-        attachments?: Attachments
+        attachments?: Attachments,
+        board = mission?.map ?? ''
     ) {
         if (!Number.isFinite(missionFriction) || missionFriction < 0 || missionFriction > 1.5)
             throw new Error('Mission contact friction must be between 0 and 1.5.');
@@ -300,14 +301,15 @@ export class Engine {
             throw new Error('Choose either a mission arm or the Cargo Harbor lift.');
         if (mission)
             this.competition = new CompetitionWorld(mission, start, missionFriction, attachments, {
-                season: !!attachments
+                season: !!attachments,
+                board
             });
         else if (lift) this.manipulation = new ManipulationWorld(start, lift);
         else if (attachments)
             this.competition = new CompetitionWorld(
                 {
                     id: 'free-field',
-                    map: '',
+                    map: board,
                     number: '',
                     name: 'Free run',
                     kind: 'wall',
@@ -321,7 +323,8 @@ export class Engine {
                 },
                 start,
                 missionFriction,
-                attachments
+                attachments,
+                { season: true, board }
             );
     }
     sampleSensors() {

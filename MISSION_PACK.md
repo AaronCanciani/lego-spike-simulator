@@ -2,6 +2,8 @@
 
 ## Shared-season update
 
+**Board-loading correction:** selecting a map now loads all its available models without requiring a mission selection. Fourteen static obstacle envelopes supplement the existing mechanisms across 2021, 2024 and 2025. See [solid board coverage and limits](BOARD_OBSTACLES.md). Static envelopes block movement and sensing but are not functional scored missions.
+
 Normal app runs now load **all implemented missions from the selected season into one physics world**, with one robot, shared contact/sensor geometry and independent mechanism state. For example RePLAY includes Boccia, Step Counter and Tire Flip together. Selecting an objective no longer makes those other implemented models disappear. The mission brief lists which models are present. This is **not a complete official field**: unimplemented models pictured in photographic mats remain flat, and the photographic color-sampling limitation remains.
 
 Both C and D now accept [configurable physical attachments](ATTACHMENTS.md). Default: rear dozer C, front lift D. The old C-only paddle descriptions below document the legacy regression fixture, not the normal app. Reliability workers capture the selected attachments and recreate the same shared-season world on replay. Generic starter snippets do not automatically reposition tools or guarantee success with every rig.

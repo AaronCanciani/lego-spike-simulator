@@ -661,6 +661,9 @@ select {
     color: #8fa2b9;
     margin-top: 5px;
 }
+.field-tag.compact small {
+    display: none;
+}
 .camera-tools {
     display: flex;
     gap: 4px;

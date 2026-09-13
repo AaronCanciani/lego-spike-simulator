@@ -110,6 +110,13 @@ export function createCompetitionView() {
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 mesh.name = part.id;
+                if (part.id.startsWith('obstacle-'))
+                    mesh.add(
+                        new THREE.LineSegments(
+                            new THREE.EdgesGeometry(mesh.geometry),
+                            new THREE.LineBasicMaterial({ color: '#fff0ca' })
+                        )
+                    );
                 meshes.set(part.id, mesh);
                 group.add(mesh);
             }

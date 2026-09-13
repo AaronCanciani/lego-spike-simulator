@@ -15,6 +15,7 @@ import { missionCatalog, type MissionDefinition } from './missionCatalog.ts';
 import type { Pose } from './sensors.ts';
 import { AttachmentPhysics } from './attachmentPhysics.ts';
 import type { Attachments } from './attachments.ts';
+import { obstaclesForBoard, tableWalls } from './boardGeometry.ts';
 
 type Motor = { position: number; velocity: number; command: number; target: number | null };
 export type Part = {
@@ -73,7 +74,7 @@ export class CompetitionWorld {
         start: Pose,
         friction = 0.45,
         tools?: Attachments,
-        options: { season?: boolean; host?: CompetitionWorld } = {}
+        options: { season?: boolean; host?: CompetitionWorld; board?: string } = {}
     ) {
         this.mission = structuredClone(mission);
         if (mission.id === 'free-field') this.message = 'Free run';
@@ -100,13 +101,17 @@ export class CompetitionWorld {
             })
         );
         this.solid('floor', [2362, 20, 1143], [0, -10, 0], '#344252', 0, 1);
-        for (const [id, size, pos] of [
-            ['south', [2414, 78, 26], [0, 39, 584.5]],
-            ['north', [2414, 78, 26], [0, 39, -584.5]],
-            ['west', [26, 78, 1143], [-1194, 39, 0]],
-            ['east', [26, 78, 1143], [1194, 39, 0]]
-        ] as [string, number[], number[]][])
-            this.solid(id, size, pos, '#536276', 0, 1);
+        for (const wall of tableWalls)
+            this.solid(wall.id, wall.size, wall.position, '#ced5dc', 0, 1);
+        if (options.board)
+            for (const obstacle of obstaclesForBoard(options.board)) {
+                this.solid(
+                    `obstacle-${obstacle.id}`,
+                    [obstacle.width, obstacle.height, obstacle.depth],
+                    [obstacle.x, obstacle.height / 2, -obstacle.y],
+                    obstacle.color
+                );
+            }
         this.chassis = new Body({
             mass: 1.2,
             shape: box([190, 90, 180]),
@@ -156,7 +161,7 @@ export class CompetitionWorld {
         this.build();
         if (options.season)
             for (const other of missionCatalog.filter(
-                (m) => m.map === mission.map && m.id !== mission.id
+                (m) => m.map === (options.board ?? mission.map) && m.id !== mission.id
             ))
                 this.companions.push(
                     new CompetitionWorld(other, start, friction, tools, { host: this })
