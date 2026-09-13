@@ -13,6 +13,7 @@ import { raycast, type Pose } from './sensors.ts';
 // Original teaching fixture. SI units internally; the rest of SPIKE Lab uses mm.
 // This is a linear carriage, NOT a reconstruction of a LEGO attachment.
 export const liftStart = { x: 0, y: -360, heading: 0 };
+export const cargoPickup = { x: 0, y: -85 };
 export const deliveryZone = { x: 0, y: 160, width: 210, depth: 180 };
 export const cubeParts = [
     { size: [60, 50, 60], offset: [0, 4, 0] },
@@ -169,7 +170,7 @@ export class ManipulationWorld {
         this.world.addBody(this.chassis);
         this.cube = new Body({
             mass: config.mass,
-            position: new Vec3(0, 0.033, 0.085),
+            position: new Vec3(cargoPickup.x / 1000, 0.033, -cargoPickup.y / 1000),
             material,
             collisionFilterGroup: 2
         });

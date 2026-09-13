@@ -1,5 +1,11 @@
 # Cargo lab: physical attachment milestone
 
+## Hosted mission map
+
+The public site includes **Cargo Harbor · delivery mission** in the field selector on the Run tab. Selecting it loads the original harbor mat, robot launch pose, powered fork and physical payload without replacing the student's program. Open the mission brief for the objective, or choose **Load mission example** to explicitly replace the program with the demonstration (edited-program confirmation still applies). The cargo experiment also selects this map. New cargo drafts/backups preserve the map choice.
+
+The artwork marks the blue launch pad, orange pickup bay, green scored delivery dock, and a real black printed sensor guide. The same rendered canvas supplies color/reflection readings. Water, markings and printed berths are artwork, not additional physical obstacles. This is original training artwork, **not an official or historical FIRST LEGO League map**. Archived competition artwork remains outside the public build pending permission review.
+
 Choose **Experiments → Cargo lab · lift & deliver**, then Run. Build edits the same ordinary Word Blocks program. The default example approaches a pallet-footed orange cube, lifts with motor C, drives to the green zone, lowers, backs away, and waits for settling. It succeeds at the default illustrative settings. It is a timed baseline, **not a closed-loop cargo controller or a claim of hardware reliability**.
 
 ## Implemented

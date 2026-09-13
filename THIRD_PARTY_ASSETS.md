@@ -18,6 +18,8 @@ Upstream README links [DrivingBase3.mpd](https://ahfiles.s3.amazonaws.com/robots
 
 ## New preview assets
 
+`src/lab/cargoMap.ts` draws the original Cargo Harbor mission map in-browser. It is included in the public release and uses no historical FIRST/LEGO artwork. Mission coordinates share the cargo physics definitions; printed scenery is not an official competition field.
+
 Cargo physics reuses [cannon-es](https://github.com/pmndrs/cannon-es), pinned to 0.20.0 (MIT). The cargo cube, fork, guide frame and delivery-zone meshes are original code-generated geometry, with no imported LEGO assets. The dependency's required notice follows and is included in the public site's notices:
 
 > Copyright (c) 2015 cannon.js Authors

@@ -13,6 +13,7 @@
     import { jointExample } from './lab/jointExample';
     import { liftExample } from './lab/liftExample';
     import { liftStart, defaultLift } from './lab/manipulation';
+    import { cargoMissionMap } from './lab/cargoMap';
     let liftEnabled = false,
         liftConfig = { ...defaultLift };
     import { defaultSensors } from './lab/sensors';
@@ -89,9 +90,12 @@
         const c = saved.cargo;
         new Engine({ targets: [] }, c.profile, c.start, c.config); // Validate before changing UI settings.
         if (
-            !['practice', 'sensor-course', ...(publicRelease ? [] : ['2023', '2024'])].includes(
-                c.map
-            ) ||
+            ![
+                'practice',
+                'sensor-course',
+                'cargo-harbor',
+                ...(publicRelease ? [] : ['2023', '2024'])
+            ].includes(c.map) ||
             !['ideal', 'illustrative'].includes(c.realism)
         )
             throw new Error('Unsupported cargo field settings.');
@@ -362,8 +366,8 @@
         liftEnabled = example === 'lift';
         if (liftEnabled) {
             start = { ...liftStart };
-            if (map !== 'practice') {
-                map = 'practice';
+            if (map !== 'cargo-harbor') {
+                map = 'cargo-harbor';
                 mapReady = false;
             }
             appearance = 'advanced';
@@ -527,6 +531,16 @@
     }
     function selectMap() {
         if (map !== '2024') mission = false;
+        if (map === 'cargo-harbor') {
+            liftEnabled = true;
+            liftConfig = { ...defaultLift };
+            start = { ...liftStart };
+            appearance = 'advanced';
+            world?.cargoOverview();
+            announce(
+                'Cargo Harbor loaded. Your program is unchanged. Use Load mission example for a demonstration.'
+            );
+        }
         mapReady = map === readyMap;
         reset();
     }
@@ -878,11 +892,37 @@
                     on:change={selectMap}
                     >{#if !publicRelease}<option value="2024">SUBMERGED · 2024</option><option
                             value="2023">MASTERPIECE · 2023</option
-                        >{/if}<option value="practice">Calibration grid</option><option
-                        value="sensor-course">Color & line course</option
+                        >{/if}<option value="cargo-harbor">Cargo Harbor · delivery mission</option
+                    ><option value="practice">Calibration grid</option><option value="sensor-course"
+                        >Color & line course</option
                     ></select
                 >
             </div>
+            {#if map === 'cargo-harbor'}
+                <div class="mission-brief" aria-label="Cargo Harbor mission">
+                    <details>
+                        <summary
+                            >Mission 01 · Cargo delivery <span
+                                >{snapshot.manipulation?.delivered
+                                    ? '✓ Complete'
+                                    : 'View objective'}</span
+                            ></summary
+                        >
+                        <p>
+                            {cargoMissionMap.brief} Success requires the cube to rest for 0.5 seconds
+                            without touching the forks. This is an original training mission, not an
+                            official FLL challenge.
+                        </p>
+                    </details>
+                    <button
+                        disabled={busy}
+                        on:click={() => {
+                            example = 'lift';
+                            loadExample();
+                        }}>Load mission example</button
+                    >
+                </div>
+            {/if}
             <div class="world-surface">
                 <WorldView
                     bind:this={world}
@@ -907,11 +947,13 @@
                 />
                 <div class="world-top">
                     <span class="field-tag"
-                        >{snapshot.manipulation
-                            ? 'CARGO LAB · PROTOTYPE'
-                            : map === 'practice' || map === 'sensor-course'
-                              ? 'PRACTICE FIELD'
-                              : 'FLL CHALLENGE'}<small
+                        >{map === 'cargo-harbor'
+                            ? 'CARGO HARBOR · MISSION 01'
+                            : snapshot.manipulation
+                              ? 'CARGO LAB · PROTOTYPE'
+                              : map === 'practice' || map === 'sensor-course'
+                                ? 'PRACTICE FIELD'
+                                : 'FLL CHALLENGE'}<small
                             >{snapshot.manipulation
                                 ? snapshot.manipulation.delivered
                                     ? '✓ Delivered & resting'
@@ -940,7 +982,11 @@
                     <div class="camera-tools">
                         <button title="Overhead camera" on:click={() => world.overhead()}
                             >Top</button
-                        ><button title="Reset 3D camera" on:click={() => world.home()}>3D</button
+                        ><button
+                            title="Reset 3D camera"
+                            on:click={() =>
+                                map === 'cargo-harbor' ? world.cargoOverview() : world.home()}
+                            >3D</button
                         ><button
                             title="Inspect robot and moving tools"
                             on:click={() => world.robotCloseup()}>Robot</button

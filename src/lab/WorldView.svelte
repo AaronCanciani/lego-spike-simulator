@@ -13,6 +13,7 @@
     let manipulationView: ReturnType<typeof createManipulationView>;
     import { createSensorView } from './sensorView';
     import { makeSensorCourse } from './sensorCourse';
+    import { drawCargoMap } from './cargoMap';
     import type { Reading } from './sensors';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
@@ -115,6 +116,14 @@
     async function setMap(value: string) {
         loadedMap = value;
         const request = ++loadingId;
+        if (value === 'cargo-harbor') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2362;
+            canvas.height = 1143;
+            drawCargoMap(canvas.getContext('2d')!);
+            applyTexture(new THREE.CanvasTexture(canvas), canvas);
+            return;
+        }
         if (value === 'sensor-course') {
             const pixels = makeSensorCourse();
             const c = document.createElement('canvas');
