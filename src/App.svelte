@@ -780,6 +780,7 @@
         }
         mapReady = map === readyMap;
         reset();
+        if (map !== 'cargo-harbor') world?.home();
     }
     function placement(event: CustomEvent<{ x: number; y: number }>) {
         if (selectedMission) practiceApproach = true;

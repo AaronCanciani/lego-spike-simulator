@@ -150,6 +150,8 @@
                 {/if}
             </details>
         </details>
+    {:else if map === 'cargo-harbor'}
+        <small>Cargo Harbor uses its separate lift and payload simulation.</small>
     {:else}
         <small
             >4 solid table walls · {state?.missions.length ?? 0} working models · {obstaclesForBoard(
