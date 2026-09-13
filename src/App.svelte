@@ -7,7 +7,12 @@
     import WorldView from './lab/WorldView.svelte';
     import StudentRobotSetup from './lab/StudentRobotSetup.svelte';
     import AttachmentSettings from './lab/AttachmentSettings.svelte';
-    import { adbAttachments, legacyAttachments, type Attachments } from './lab/attachments';
+    import {
+        adbAttachments,
+        legacyAttachments,
+        updateDraftLiftSize,
+        type Attachments
+    } from './lab/attachments';
     let attachments: Attachments = structuredClone(adbAttachments);
     import MissionPanel from './lab/MissionPanel.svelte';
     import { archivedMaps, findMission } from './lab/missionCatalog';
@@ -824,6 +829,8 @@
         try {
             const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
             if (draft?.format === 'spike-lab' && draft.version === 1) {
+                if (draft.setup?.attachments)
+                    draft.setup.attachments = updateDraftLiftSize(draft.setup.attachments);
                 restoreCargo(draft);
                 accept(draft.project, String(draft.name || 'My robot program'));
                 mode = 'build';

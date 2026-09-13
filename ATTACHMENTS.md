@@ -8,6 +8,8 @@ My Robot offers independent C/D choices: dozer, lift arm, simple paddle or no at
 
 The front attachment has two bent rails and a short lifting finger. The rear attachment has segmented curved supports, a wide blue blade and purple bottom edge. Rendering and collision use the **same part definitions**, including orientation. These are original simplified geometry, not imported LEGO CAD or an exact brick assembly.
 
+The front lift's default outline is 30% smaller following the student's visual feedback: length 129.5 mm, width 16.8 mm and drop 67.2 mm (previously 185 / 24 / 96). Beam thickness, chassis mounting pivot, gearing, travel limits, mass and torque are unchanged; this is an approximate outline correction, not a hardware calibration. The shorter finger has less reach and ground clearance changes accordingly. The rear dozer is unchanged. Untouched old front-lift presets in browser drafts update automatically; custom configurations, imported backups and recorded replays retain their explicit geometry.
+
 ## Mechanics and limits
 
 -   Hinge motors have finite output torque (shaft limit × gear ratio × assumed 0.8 efficiency), gravity loads and capped integral position control. Shafts report actual geared joint movement. Impossible angle targets remain pending/stalled, not falsely completed.

@@ -42,6 +42,7 @@ export function toolPreset(kind: ToolKind): ToolConfig {
         mass: 0.09,
         torque: 0.2
     };
+    if (kind === 'lift') return { ...common, length: 129.5, width: 16.8, drop: 67.2 };
     if (kind === 'dozer')
         return {
             ...common,
@@ -74,6 +75,21 @@ export function toolPreset(kind: ToolKind): ToolConfig {
 }
 export const adbAttachments: Attachments = { C: toolPreset('dozer'), D: toolPreset('lift') };
 export const legacyAttachments: Attachments = { C: toolPreset('paddle'), D: toolPreset('none') };
+// Upgrade only untouched front-lift presets in browser drafts. Explicitly imported
+// backups/replays and any user-calibrated attachment configurations stay unchanged.
+export function updateDraftLiftSize(tools: Attachments): Attachments {
+    const updated = structuredClone(tools);
+    const previous = { ...toolPreset('lift'), length: 185, width: 24, drop: 96 };
+    for (const port of ['C', 'D'] as const) {
+        if (
+            Object.entries(previous).every(
+                ([key, value]) => updated[port]?.[key as keyof ToolConfig] === value
+            )
+        )
+            updated[port] = toolPreset('lift');
+    }
+    return updated;
+}
 export function validateAttachments(tools: Attachments) {
     if (!tools?.C || !tools?.D) throw new Error('Configure both attachment ports C and D.');
     for (const c of Object.values(tools)) {

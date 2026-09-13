@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Body, Box, Vec3 } from 'cannon-es';
-import { adbAttachments, toolPreset, toolParts, validateAttachments } from './attachments.ts';
+import {
+    adbAttachments,
+    toolPreset,
+    toolParts,
+    validateAttachments,
+    updateDraftLiftSize
+} from './attachments.ts';
 import { CompetitionWorld } from './competitionWorld.ts';
 import { wallMission, missionCatalog } from './missionCatalog.ts';
 import { Engine, defaultProfile, DT } from './engine.ts';
@@ -12,6 +18,39 @@ const rig = (tools = structuredClone(adbAttachments)) =>
 function step(w, seconds, C = motor(), D = motor(), vy = 0) {
     for (let i = 0; i < seconds / DT; i++) w.step(DT, 0, vy, 0, C, D);
 }
+
+test('front lift outline is 30% smaller while the rear dozer and mount stay unchanged', () => {
+    const lift = toolPreset('lift'),
+        dozer = toolPreset('dozer');
+    for (const [key, previous] of Object.entries({ length: 185, width: 24, drop: 96 }))
+        assert.ok(Math.abs(lift[key] / previous - 0.7) < 1e-12);
+    assert.equal(lift.forward, 75);
+    assert.equal(lift.height, 105);
+    assert.equal(lift.ratio, 3);
+    assert.equal(dozer.length, 170);
+    assert.equal(dozer.width, 120);
+    assert.equal(dozer.drop, 75);
+    const tip = toolParts(lift).find((p) => p.id === 'tip');
+    assert.equal(tip.size[0], 16.8);
+    assert.equal(tip.position[1], -67.2);
+    assert.equal(tip.position[2] - tip.size[2] / 2, -129.5);
+});
+
+test('draft upgrade resizes only untouched old front lifts, is idempotent and never mutates input', () => {
+    const old = { ...toolPreset('lift'), length: 185, width: 24, drop: 96 };
+    const tools = { C: toolPreset('dozer'), D: old },
+        original = structuredClone(tools);
+    const updated = updateDraftLiftSize(tools);
+    assert.deepEqual(updated.D, toolPreset('lift'));
+    assert.deepEqual(updated.C, tools.C);
+    assert.deepEqual(tools, original);
+    assert.deepEqual(updateDraftLiftSize(updated), updated);
+    for (const change of [{ length: 180 }, { facing: 'rear' }, { ratio: 4 }, { initial: 30 }]) {
+        const custom = { C: toolPreset('dozer'), D: { ...old, ...change } };
+        assert.deepEqual(updateDraftLiftSize(custom), custom);
+    }
+    assert.deepEqual(updateDraftLiftSize({ C: old, D: toolPreset('none') }).C, toolPreset('lift'));
+});
 
 test('stock pair places physical C dozer behind and D lift in front; every rendered part has a collider', () => {
     const w = rig();
@@ -110,9 +149,11 @@ test('rear dozer pushes a cube through blade contact; raising the blade misses i
     assert.ok(run(0) > 0.33);
     assert.ok(Math.abs(run(80) - 0.3) < 0.005);
 });
-test('front finger physically raises a supported plate; a missed plate stays down', () => {
+test('a longer custom front finger physically raises a supported plate; a missed plate stays down', () => {
     const run = (z) => {
         const tools = structuredClone(adbAttachments);
+        // Ground-reaching custom geometry; the shorter stock lift must not gain invisible reach.
+        Object.assign(tools.D, { length: 185, width: 24, drop: 96 });
         tools.D.initial = 0;
         const w = rig(tools),
             b = payload(w, [0, 0.021, z], [0.06, 0.012, 0.07], 0.03),
@@ -144,6 +185,24 @@ test('a port without a tool remains an unloaded motor, not an unreachable physic
     e.start();
     while (e.state === 'running') e.step();
     assert.equal(e.state, 'finished', e.error);
+});
+
+test('shorter stock lift misses a ground-level plate at the old reach, with no invisible pickup', () => {
+    const tools = structuredClone(adbAttachments);
+    tools.D.initial = 0;
+    const w = rig(tools),
+        D = motor(),
+        plate = payload(w, [0, 0.021, -0.245], [0.06, 0.012, 0.07], 0.03);
+    D.command = 45;
+    D.target = 90;
+    let highest = 0;
+    // Allow the finite-torque position controller to settle after lifting.
+    for (let i = 0; i < 10 / DT; i++) {
+        w.step(DT, 0, 0, 0, motor(), D);
+        highest = Math.max(highest, plate.position.y);
+    }
+    assert.ok(highest < 0.025);
+    assert.equal(D.target, null);
 });
 test('season models share one world, render all colliders, and appear in sensor rays', () => {
     for (const mission of missionCatalog) {
