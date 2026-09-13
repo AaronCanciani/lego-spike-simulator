@@ -6,6 +6,7 @@
     import { parseReferenceRig, updateRig, disposeRig, type RobotRig } from './robotRig';
     import { createMissionView } from './missionView';
     import { createSensorView } from './sensorView';
+    import { makeSensorCourse } from './sensorCourse';
     import type { Reading } from './sensors';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
@@ -91,6 +92,17 @@
     async function setMap(value: string) {
         loadedMap = value;
         const request = ++loadingId;
+        if (value === 'sensor-course') {
+            const pixels = makeSensorCourse();
+            const c = document.createElement('canvas');
+            c.width = pixels.width;
+            c.height = pixels.height;
+            const image = c.getContext('2d')!.createImageData(c.width, c.height);
+            image.data.set(pixels.data);
+            c.getContext('2d')!.putImageData(image, 0, 0);
+            applyTexture(new THREE.CanvasTexture(c), c);
+            return;
+        }
         if (value === 'practice') {
             const c = document.createElement('canvas');
             c.width = 1600;

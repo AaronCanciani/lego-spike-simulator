@@ -794,6 +794,13 @@ select {
     padding: 10px 20px;
     font-size: 12px;
 }
+.sensor-outcome {
+    background: #183a48;
+    color: #a6f3d4;
+    padding: 8px 20px;
+    font-size: 12px;
+    flex-shrink: 0;
+}
 .sensor-hud > small {
     grid-column: 1 / -1;
 }

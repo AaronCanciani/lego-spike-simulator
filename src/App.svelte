@@ -5,6 +5,9 @@
     import WorldView from './lab/WorldView.svelte';
     import { drivingExample } from './lab/examples';
     import { sensorExample } from './lab/sensorExamples';
+    import { colorExample, resultVariable, type ColorExperiment } from './lab/colorExamples';
+    import { samplePixels } from './lab/colorSampling';
+    import { courseStart } from './lab/sensorCourse';
     import { defaultSensors } from './lab/sensors';
     import { coralExample } from './lab/missionExample';
     import { coralMission, MissionMonitor } from './lab/mission';
@@ -86,42 +89,7 @@
     }
     function sampleColor(x: number, y: number) {
         if (!mapPixels || !mapCanvas) return { color: 10, reflection: 90 };
-        const px = Math.round((x / WIDTH + 0.5) * (mapCanvas.width - 1)),
-            py = Math.round((0.5 - y / HEIGHT) * (mapCanvas.height - 1));
-        if (px < 0 || py < 0 || px >= mapCanvas.width || py >= mapCanvas.height)
-            return { color: -1, reflection: 0 };
-        let r = 0,
-            g = 0,
-            b = 0,
-            count = 0;
-        for (let dx = -1; dx <= 1; dx++)
-            for (let dy = -1; dy <= 1; dy++) {
-                const ix = Math.max(0, Math.min(mapCanvas.width - 1, px + dx)),
-                    iy = Math.max(0, Math.min(mapCanvas.height - 1, py + dy)),
-                    i = (iy * mapCanvas.width + ix) * 4;
-                r += mapPixels.data[i];
-                g += mapPixels.data[i + 1];
-                b += mapPixels.data[i + 2];
-                count++;
-            }
-        r /= count;
-        g /= count;
-        b /= count;
-        const high = Math.max(r, g, b),
-            low = Math.min(r, g, b);
-        let color = -1;
-        if (high < 65) color = 0;
-        else if (high - low < 35) color = high < 170 ? -1 : 10;
-        else if (r > g * 1.3 && b > g * 1.3) color = 1;
-        else if (b > r * 1.15 && b > g * 1.05) color = 3;
-        else if (r > g * 1.35 && r > b * 1.25) color = 9;
-        else if (r > 150 && g > 125 && b < g * 0.7) color = 7;
-        else if (g > r * 1.1 && g > b * 1.05) color = 6;
-        else if (b > r && g > r) color = 4;
-        return {
-            color,
-            reflection: Math.round(((r * 0.2126 + g * 0.7152 + b * 0.0722) / 255) * 100)
-        };
+        return samplePixels(mapPixels, x, y);
     }
     function reset() {
         if (!project) return;
@@ -220,6 +188,28 @@
     function loadExample() {
         if (!example) return;
         mission = example.startsWith('coral');
+        if (example.startsWith('course-')) {
+            const kind = example.slice(7) as ColorExperiment;
+            profile.sensorConfig = structuredClone(defaultSensors);
+            profile.sensorConfig.ports.B.height = 16;
+            profile.sensorConfig.ports.F.height = 16;
+            start = { ...courseStart[kind] };
+            if (map !== 'sensor-course') {
+                map = 'sensor-course';
+                mapReady = false;
+            }
+            lastFile = null;
+            showSensors = true;
+            accept(
+                colorExample(kind),
+                kind === 'line' ? 'Follow the curve · stop at red' : `Color mode · stop at ${kind}`
+            );
+            announce(
+                'B/F color sensors raised to 16 mm. Uses live sensor feedback; times out after 12 seconds if the target is missed.'
+            );
+            example = '';
+            return;
+        }
         if (example.startsWith('sensor-')) {
             const kind = example.slice(7) as 'color' | 'distance' | 'force';
             profile.sensorConfig = structuredClone(defaultSensors);
@@ -427,7 +417,10 @@
                 ><option value="coral-open">Coral Nursery · open loop</option>
                 <option value="sensor-color">Reflection · stop at line</option>
                 <option value="sensor-distance">Distance · stop before wall</option>
-                <option value="sensor-force">Force · stop on contact</option></select
+                <option value="sensor-force">Force · stop on contact</option>
+                <option value="course-red">Color · stop at red</option><option value="course-blue"
+                    >Color · stop at blue</option
+                ><option value="course-line">Line · follow curve to red</option></select
             ><button
                 class="quiet"
                 disabled={busy || loading}
@@ -603,7 +596,9 @@
                     on:change={selectMap}
                     ><option value="2024">SUBMERGED · 2024</option><option value="2023"
                         >MASTERPIECE · 2023</option
-                    ><option value="practice">Calibration grid</option></select
+                    ><option value="practice">Calibration grid</option><option value="sensor-course"
+                        >Color & line course</option
+                    ></select
                 >
             </div>
             <div class="world-surface">
@@ -628,10 +623,14 @@
                 />
                 <div class="world-top">
                     <span class="field-tag"
-                        >{map === 'practice' ? 'PRACTICE FIELD' : 'FLL CHALLENGE'}<small
-                            >{map === 'practice'
-                                ? 'Grid and color targets'
-                                : 'Mat + boundary walls'}</small
+                        >{map === 'practice' || map === 'sensor-course'
+                            ? 'PRACTICE FIELD'
+                            : 'FLL CHALLENGE'}<small
+                            >{map === 'sensor-course'
+                                ? 'Color markers + curved line'
+                                : map === 'practice'
+                                  ? 'Grid and color targets'
+                                  : 'Mat + boundary walls'}</small
                         ><small title={modelStatus}
                             >{appearance === 'cylinder'
                                 ? 'Cylinder proxy'
@@ -722,6 +721,9 @@
                     >
                 </div>
             </div>
+            {#if snapshot.variables[resultVariable]}<div class="sensor-outcome" role="status">
+                    {snapshot.variables[resultVariable]}
+                </div>{/if}
             <div class="world-footer">
                 <span class="calibration-indicator"></span><span
                     >{realism === 'ideal' ? 'Ideal reference' : 'Illustrative physics'} · not calibrated

@@ -729,6 +729,7 @@ export class Engine {
             slip: this.slipNow,
             motors: structuredClone(this.motors),
             encoders: structuredClone(this.sensorBank.encoders),
+            variables: { ...this.variables },
             active: this.threads.filter((t) => !t.done).map((t) => t.active),
             calls: this.threads[0]?.calls.slice() || [],
             args: { ...this.threads[0]?.args },

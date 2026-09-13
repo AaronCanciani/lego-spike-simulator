@@ -42,6 +42,8 @@ Only modeled table boundaries produce echoes/contact. Printed mission artwork an
 
 ## Student experiments and validation
 
+The second sensor-test milestone adds red/blue marker stopping and continuous line-following on a shared raster training course. Positive and deliberately broken-feedback runs are documented in [SENSOR_TESTS.md](SENSOR_TESTS.md). These supplement, rather than replace, the sensor-stop checks below. Their UI presets disclose raising both color sensors to 16 mm.
+
 Experiments menu: Reflection — stop at line; Distance — stop before wall; Force — stop on contact. Each is an ordinary Scratch graph following the same interpreter and visualizer as uploaded `.llsp3` programs. The preset replaces B, keeps F color, sets a forward-facing start on the calibration grid and enables the live sensor overlay. Settings expose B/F type and mounting geometry plus reflection noise, distance error and dropout.
 
 Run `npm test`, `npm run check`, `npm run build`. Tests cover sample-and-hold, finite footprint, stock-height failure stress, range/occlusion, accuracy envelopes, seeded independence, independent touch vs force, rear contact, encoder error, native block names, unit conversions, no echo, incorrect ports and end-to-end sensor-controlled stops. These validate the model's implementation, not its real-world predictive accuracy.

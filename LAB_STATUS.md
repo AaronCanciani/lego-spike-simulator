@@ -14,6 +14,8 @@ The **Experiments** menu loads two purpose-built Scratch graphs: an open-loop tw
 
 ## What is implemented
 
+New color/line experiments and their positive/negative coverage are described in [SENSOR_TESTS.md](SENSOR_TESTS.md). Red and blue marker stops now exercise the real pixel classifier; a continuous reflected-light controller follows a curved training line to a red finish. These use ordinary Scratch blocks and distinguish detected targets from timeouts.
+
 - Reuses upstream Scratch-to-Blockly conversion, block definitions and renderer. New bounded generator interpreter in `src/lab/engine.ts`; unsupported reachable blocks fail explicitly.
 - Fixed 5 ms simulation time, seeded experiments, separate encoder/true-pose/sensed-yaw values, motor response and residual gain mismatch, effective wheel mismatch, illustrative surface slip, gyro drift/noise/quantization/delay.
 - Three.js cylinder or imported LDraw reference build, encoder-animated wheels and demonstration C/D tools, orbit/overhead/robot cameras, trail, sensor markers, clickable placement, telemetry and editable robot profile.
