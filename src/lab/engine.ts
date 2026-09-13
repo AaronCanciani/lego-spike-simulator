@@ -1,6 +1,7 @@
 // Fixed-clock SPIKE Word Blocks runner. Rendering never advances this clock.
 // Steering and paired motor polarity follow the upstream Hardy VM conventions.
 import { SensorBank, defaultSensors, type SensorConfig } from './sensors.ts';
+import { ManipulationWorld, type LiftConfig } from './manipulation.ts';
 export type Block = {
     opcode: string;
     next?: string;
@@ -203,6 +204,7 @@ export function inspect(project: Project) {
 }
 
 export class Engine {
+    manipulation: ManipulationWorld | null = null;
     profile: Profile;
     info: ReturnType<typeof inspect>;
     motors: Record<string, Motor> = {};
@@ -240,7 +242,8 @@ export class Engine {
     constructor(
         project: Project,
         profile: Profile = defaultProfile,
-        start = { x: -950, y: -330, heading: 180 }
+        start = { x: -950, y: -330, heading: 180 },
+        lift: LiftConfig | null = null
     ) {
         for (const key of [
             'wheel',
@@ -283,9 +286,17 @@ export class Engine {
         for (const target of project.targets)
             for (const [id, v] of Object.entries(target.variables || {})) this.variables[id] = v[1];
         this.path = [[this.x, this.y]];
+        if (lift) this.manipulation = new ManipulationWorld(start, lift);
     }
     sampleSensors() {
-        this.sensorBank.sample(this.tick, this, this.colorAt, this.motors);
+        this.sensorBank.sample(
+            this.tick,
+            this,
+            this.colorAt,
+            this.motors,
+            undefined,
+            this.manipulation ? this.manipulation.ray.bind(this.manipulation) : undefined
+        );
     }
     random() {
         this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0;
@@ -655,6 +666,7 @@ export class Engine {
     }
     physics() {
         for (const [port, m] of Object.entries(this.motors)) {
+            if (this.manipulation && port === 'C') continue;
             const side = port === this.profile.left ? 1 : port === this.profile.right ? -1 : 0;
             const gain = 1 + (side * this.profile.motorMismatch) / 200;
             const tau =
@@ -690,13 +702,20 @@ export class Engine {
             mid = (this.heading * Math.PI) / 180 + (angular * DT) / 2;
         const dx = ((vl + vr) / 2) * Math.sin(mid) * DT,
             dy = ((vl + vr) / 2) * Math.cos(mid) * DT;
-        const nx = clamp(this.x + dx, -WIDTH / 2 + 100, WIDTH / 2 - 100),
+        let nx = clamp(this.x + dx, -WIDTH / 2 + 100, WIDTH / 2 - 100),
             ny = clamp(this.y + dy, -HEIGHT / 2 + 100, HEIGHT / 2 - 100);
         this.collision = Math.abs(nx - this.x - dx) > 0.01 || Math.abs(ny - this.y - dy) > 0.01;
+        if (this.manipulation) {
+            const next = this.manipulation.step(DT, dx / DT, dy / DT, angular, this.motors.C);
+            nx = next.x;
+            ny = next.y;
+            this.heading = next.heading;
+            this.collision = this.manipulation.contact;
+        }
         this.distance += Math.hypot(nx - this.x, ny - this.y);
         this.x = nx;
         this.y = ny;
-        this.heading += (angular * DT * 180) / Math.PI;
+        if (!this.manipulation) this.heading += (angular * DT * 180) / Math.PI;
         this.drift += p.gyroBias * DT;
         if (this.tick % 4 === 0) {
             this.yaw = Math.round(
@@ -733,7 +752,8 @@ export class Engine {
             active: this.threads.filter((t) => !t.done).map((t) => t.active),
             calls: this.threads[0]?.calls.slice() || [],
             args: { ...this.threads[0]?.args },
-            sensors: structuredClone(this.sensors)
+            sensors: structuredClone(this.sensors),
+            manipulation: this.manipulation?.snapshot() ?? null
         };
     }
 }

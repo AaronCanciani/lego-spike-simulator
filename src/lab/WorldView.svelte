@@ -7,6 +7,10 @@
     import { parseReferenceRig, updateRig, disposeRig, type RobotRig } from './robotRig';
     import { createAdvancedRig, updateAdvancedRig, type AdvancedRig } from './advancedRig';
     import { createMissionView } from './missionView';
+    import { createManipulationView } from './manipulationView';
+    import type { ManipulationSnapshot } from './manipulation';
+    export let manipulation: ManipulationSnapshot | null = null;
+    let manipulationView: ReturnType<typeof createManipulationView>;
     import { createSensorView } from './sensorView';
     import { makeSensorCourse } from './sensorCourse';
     import type { Reading } from './sensors';
@@ -65,6 +69,12 @@
         lastRobotPosition.set(pose.x, 0, -pose.y);
         camera?.position.set(pose.x + 320, 300, -pose.y - 380);
         controls?.target.set(pose.x, 70, -pose.y);
+        controls?.update();
+    }
+    export function cargoOverview() {
+        followRobot = false;
+        camera?.position.set(600, 850, 700);
+        controls?.target.set(0, 20, 65);
         controls?.update();
     }
     async function loadReference() {
@@ -268,6 +278,8 @@
             scene.add(robot);
             missionView = createMissionView();
             scene.add(missionView.group);
+            manipulationView = createManipulationView();
+            scene.add(manipulationView.group);
             textures.push(...missionView.textures);
             const buffer = new Float32Array(15000 * 3),
                 geometry = new THREE.BufferGeometry();
@@ -302,6 +314,9 @@
                 }
                 missionView.group.visible = mission && map === '2024';
                 missionView.update(missionActivated);
+                manipulationView.update(manipulation);
+                const demoTools = advanced.group.getObjectByName('illustrative-attachments');
+                if (demoTools) demoTools.visible = !manipulation;
                 markers.visible = showSensors;
                 if (showSensors) sensorView.update(profile.sensorConfig, sensors);
                 trail.visible = showTrail;

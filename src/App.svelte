@@ -11,6 +11,10 @@
     import { samplePixels } from './lab/colorSampling';
     import { courseStart } from './lab/sensorCourse';
     import { jointExample } from './lab/jointExample';
+    import { liftExample } from './lab/liftExample';
+    import { liftStart, defaultLift } from './lab/manipulation';
+    let liftEnabled = false,
+        liftConfig = { ...defaultLift };
     import { defaultSensors } from './lab/sensors';
     import { coralExample } from './lab/missionExample';
     import { coralMission, MissionMonitor } from './lab/mission';
@@ -73,12 +77,46 @@
     let draftStatus = '',
         draftTimer: ReturnType<typeof setTimeout>;
     const draftKey = 'spike-lab-program-draft-v1';
+    function cargoSave() {
+        return liftEnabled ? { config: liftConfig, start, profile, realism, map } : null;
+    }
+    function restoreCargo(saved: any) {
+        if (!Object.hasOwn(saved, 'cargo')) return; // Older backups keep the selected field.
+        if (saved.cargo === null) {
+            liftEnabled = false;
+            return;
+        }
+        const c = saved.cargo;
+        new Engine({ targets: [] }, c.profile, c.start, c.config); // Validate before changing UI settings.
+        if (
+            !['practice', 'sensor-course', ...(publicRelease ? [] : ['2023', '2024'])].includes(
+                c.map
+            ) ||
+            !['ideal', 'illustrative'].includes(c.realism)
+        )
+            throw new Error('Unsupported cargo field settings.');
+        liftConfig = { ...c.config };
+        profile = structuredClone(c.profile);
+        start = { ...c.start };
+        realism = c.realism;
+        map = c.map;
+        mapReady = map === readyMap;
+        liftEnabled = true;
+        mission = false;
+        appearance = 'advanced';
+    }
     function saveDraft() {
         try {
             const p = dirty ? program.capture() : project;
             localStorage.setItem(
                 draftKey,
-                JSON.stringify({ format: 'spike-lab', version: 1, name, project: p })
+                JSON.stringify({
+                    format: 'spike-lab',
+                    version: 1,
+                    name,
+                    project: p,
+                    cargo: cargoSave()
+                })
             );
             draftStatus = 'Draft saved in this browser';
         } catch (e) {
@@ -139,7 +177,13 @@
                 new Blob(
                     [
                         JSON.stringify(
-                            { format: 'spike-lab', version: 1, name, project: p },
+                            {
+                                format: 'spike-lab',
+                                version: 1,
+                                name,
+                                project: p,
+                                cargo: cargoSave()
+                            },
                             null,
                             2
                         )
@@ -193,7 +237,7 @@
     function reset() {
         if (!project) return;
         try {
-            engine = new Engine(project, activeProfile(), start);
+            engine = new Engine(project, activeProfile(), start, liftEnabled ? liftConfig : null);
             monitor = mission ? new MissionMonitor(start) : null;
             missionState = new MissionMonitor(start).snapshot();
             engine.colorAt = sampleColor;
@@ -201,6 +245,7 @@
             accumulator = 0;
             error = '';
             update();
+            if (!dirty) saveDraft();
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
             if (engine) {
@@ -282,6 +327,7 @@
                 const saved = JSON.parse(await file.text());
                 if (saved.format !== 'spike-lab' || saved.version !== 1)
                     throw new Error('This is not a supported SPIKE Lab program.');
+                restoreCargo(saved);
                 accept(saved.project, String(saved.name || 'My robot program'));
                 lastFile = file;
                 saveDraft();
@@ -313,6 +359,23 @@
             return;
         }
         mission = example.startsWith('coral');
+        liftEnabled = example === 'lift';
+        if (liftEnabled) {
+            start = { ...liftStart };
+            if (map !== 'practice') {
+                map = 'practice';
+                mapReady = false;
+            }
+            appearance = 'advanced';
+            lastFile = null;
+            accept(liftExample(), 'Cargo lab · lift, carry & deliver');
+            world?.cargoOverview();
+            announce(
+                'Motor C controls a prototype linear lift. The cube has real gravity and friction; green means delivered and resting without fork contact.'
+            );
+            example = '';
+            return;
+        }
         if (example === 'joints') {
             start = { x: 0, y: -100, heading: 0 };
             if (map !== 'practice') {
@@ -509,6 +572,7 @@
         try {
             const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
             if (draft?.format === 'spike-lab' && draft.version === 1) {
+                restoreCargo(draft);
                 accept(draft.project, String(draft.name || 'My robot program'));
                 mode = 'build';
                 draftStatus = 'Restored your local draft';
@@ -588,7 +652,9 @@
                 <option value="course-red">Color · stop at red</option><option value="course-blue"
                     >Color · stop at blue</option
                 ><option value="course-line">Line · follow curve to red</option>
-                <option value="joints">Robot · wheels & tools</option></select
+                <option value="joints">Robot · wheels & tools</option><option value="lift"
+                    >Cargo lab · lift & deliver</option
+                ></select
             ><button
                 class="quiet"
                 disabled={busy || loading}
@@ -833,6 +899,7 @@
                     {profile}
                     {mission}
                     missionActivated={missionState.activated}
+                    manipulation={snapshot.manipulation}
                     on:modelstatus={(e) => (modelStatus = e.detail)}
                     on:mapready={fieldReady}
                     on:place={placement}
@@ -840,22 +907,34 @@
                 />
                 <div class="world-top">
                     <span class="field-tag"
-                        >{map === 'practice' || map === 'sensor-course'
-                            ? 'PRACTICE FIELD'
-                            : 'FLL CHALLENGE'}<small
-                            >{map === 'sensor-course'
-                                ? 'Color markers + curved line'
-                                : map === 'practice'
-                                  ? 'Grid and color targets'
-                                  : 'Mat + boundary walls'}</small
+                        >{snapshot.manipulation
+                            ? 'CARGO LAB · PROTOTYPE'
+                            : map === 'practice' || map === 'sensor-course'
+                              ? 'PRACTICE FIELD'
+                              : 'FLL CHALLENGE'}<small
+                            >{snapshot.manipulation
+                                ? snapshot.manipulation.delivered
+                                    ? '✓ Delivered & resting'
+                                    : snapshot.manipulation.stalled
+                                      ? 'Lift stalled · check load / travel'
+                                      : snapshot.manipulation.lifted
+                                        ? 'Payload off the floor'
+                                        : 'Deliver to the green zone'
+                                : map === 'sensor-course'
+                                  ? 'Color markers + curved line'
+                                  : map === 'practice'
+                                    ? 'Grid and color targets'
+                                    : 'Mat + boundary walls'}</small
                         ><small title={modelStatus}
-                            >{appearance === 'advanced'
-                                ? 'ADB-style model · approximate assembly'
-                                : appearance === 'cylinder'
-                                  ? 'Cylinder proxy'
-                                  : modelStatus.startsWith('Animated')
-                                    ? 'Reference build · not exact ADB'
-                                    : 'ADB approximation · reference unavailable/loading'}</small
+                            >{snapshot.manipulation
+                                ? `Lift C · ${fmt(snapshot.manipulation.height, 0)} mm · inspector truth`
+                                : appearance === 'advanced'
+                                  ? 'ADB-style model · approximate assembly'
+                                  : appearance === 'cylinder'
+                                    ? 'Cylinder proxy'
+                                    : modelStatus.startsWith('Animated')
+                                      ? 'Reference build · not exact ADB'
+                                      : 'ADB approximation · reference unavailable/loading'}</small
                         ></span
                     >
                     <div class="camera-tools">
@@ -986,7 +1065,7 @@
         </p>
         <fieldset disabled={busy}>
             <label class="field-label"
-                >Robot appearance<select bind:value={appearance}
+                >Robot appearance<select bind:value={appearance} disabled={liftEnabled}
                     ><option value="advanced">Advanced Driving Base · approximation</option
                     >{#if !publicRelease}<option value="reference">Imported reference build</option
                         >{/if}<option value="cylinder">Diagnostic cylinder</option></select
@@ -1023,6 +1102,77 @@
                     /></label
                 >
             </div>
+            <h3>Cargo lab attachment</h3>
+            <label
+                ><input
+                    type="checkbox"
+                    bind:checked={liftEnabled}
+                    on:change={() => {
+                        if (liftEnabled) appearance = 'advanced';
+                        reset();
+                    }}
+                /> Enable prototype lift & payload</label
+            >
+            {#if liftEnabled}
+                <p class="small-note">
+                    Port C drives a linear fork carriage (0–140 mm), not his actual attachment. Cube
+                    rests on two forks; no magnetic pickup. Vertical force is limited; lateral tool
+                    reactions and chassis tipping are not modeled yet. World freezes when the
+                    program ends: include a wait to let cargo settle.
+                </p>
+                <div class="settings-grid">
+                    <label
+                        >Fork length <span>mm</span><input
+                            type="number"
+                            min="40"
+                            max="180"
+                            step="5"
+                            bind:value={liftConfig.forkLength}
+                            on:change={reset}
+                        /></label
+                    >
+                    <label
+                        >Payload mass <span>kg</span><input
+                            type="number"
+                            min="0.01"
+                            max="2"
+                            step="0.01"
+                            bind:value={liftConfig.mass}
+                            on:change={reset}
+                        /></label
+                    >
+                    <label
+                        >Surface friction<input
+                            type="number"
+                            min="0"
+                            max="1.5"
+                            step="0.05"
+                            bind:value={liftConfig.friction}
+                            on:change={reset}
+                        /></label
+                    >
+                    <label
+                        >Lift force limit <span>N · illustrative</span><input
+                            type="number"
+                            min="0.2"
+                            max="20"
+                            step="0.2"
+                            bind:value={liftConfig.maxLiftForce}
+                            on:change={reset}
+                        /></label
+                    >
+                    <label
+                        >Lift gearing <span>mm / motor degree</span><input
+                            type="number"
+                            min="0.05"
+                            max="2"
+                            step="0.05"
+                            bind:value={liftConfig.mmPerDegree}
+                            on:change={reset}
+                        /></label
+                    >
+                </div>
+            {/if}
             <h3>Drive connections</h3>
             <div class="settings-grid">
                 <label
@@ -1059,7 +1209,7 @@
             <p class="small-note">
                 Stock B/F are downward color sensors at about 8 mm. Distance or force replaces a
                 color sensor; A/C/D/E remain motors. Optional mounts point forward and sense table
-                walls only.
+                walls, plus the cargo payload when Cargo lab is enabled (at the sensor's height).
             </p>
             {#each sensorPorts as port}
                 <div class="settings-grid">

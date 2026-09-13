@@ -132,7 +132,13 @@ export class SensorBank {
         pose: Pose,
         colorAt: (x: number, y: number) => Surface,
         motors: Record<string, { position: number; velocity: number }>,
-        walls = tableWalls
+        walls = tableWalls,
+        physicalRay?: (
+            x: number,
+            y: number,
+            heading: number,
+            height: number
+        ) => { distance: number; incidence: number }
     ) {
         // LEGO publishes 100 Hz for color, distance, force and angular encoders.
         if (tick % 2 || tick === this.lastTick) return;
@@ -189,7 +195,10 @@ export class SensorBank {
                 let distance = Infinity;
                 // Sparse planar cone; beam shape and incidence cutoff await physical measurements.
                 for (let i = -4; i <= 4; i++) {
-                    const hit = raycast(point.x, point.y, pose.heading + (i * c.cone) / 4, walls);
+                    const angle = pose.heading + (i * c.cone) / 4;
+                    const hit = physicalRay
+                        ? physicalRay(point.x, point.y, angle, mount.height)
+                        : raycast(point.x, point.y, angle, walls);
                     if (!errors || hit.incidence >= 0.25)
                         distance = Math.min(distance, hit.distance);
                 }
@@ -203,11 +212,17 @@ export class SensorBank {
                         : 0;
                     r.distance = Math.round(clamp(distance + error, 50, 2000));
                 }
-                r.quality = r.valid ? 'Table walls only' : 'No valid echo';
+                r.quality = r.valid
+                    ? physicalRay
+                        ? 'Walls + physical payload'
+                        : 'Table walls only'
+                    : 'No valid echo';
             } else if (mount.kind === 'force') {
                 // Forward spring probe: mount is the backplate; tip extends eight mm.
                 const base = mountPoint(pose, { ...mount, forward: 0 });
-                const hit = raycast(base.x, base.y, pose.heading, walls);
+                const hit = physicalRay
+                    ? physicalRay(base.x, base.y, pose.heading, mount.height)
+                    : raycast(base.x, base.y, pose.heading, walls);
                 r.compression = clamp(mount.forward + 8 - hit.distance, 0, 8);
                 const threshold = 1 + (errors ? 0.5 * this.biases[port] : 0);
                 const wasPressed = this.readings[port]?.pressed;

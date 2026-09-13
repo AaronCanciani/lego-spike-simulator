@@ -18,6 +18,16 @@ Upstream README links [DrivingBase3.mpd](https://ahfiles.s3.amazonaws.com/robots
 
 ## New preview assets
 
+Cargo physics reuses [cannon-es](https://github.com/pmndrs/cannon-es), pinned to 0.20.0 (MIT). The cargo cube, fork, guide frame and delivery-zone meshes are original code-generated geometry, with no imported LEGO assets. The dependency's required notice follows and is included in the public site's notices:
+
+> Copyright (c) 2015 cannon.js Authors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 `src/lab/advancedRig.ts` creates original simplified ADB-style geometry from code, inspired by the user's reference image; it contains no imported LEGO/LDraw mesh data and is not a verified reconstruction. Its parts, decorative hub matrix, C/D tools and sensor housings are illustrative. See [ROBOT_MODEL.md](ROBOT_MODEL.md). Existing upstream licenses and notices remain in place.
 
 `static/lab-icon.svg` and the generated practice grid/cylinder are created for this fork. The bundled `static/samples/new-code-blocks.json` is extracted from the user's supplied exploratory LEGO project. It is not a demonstrated successful driving program. Google Fonts are requested by the stylesheet; program data is not included in those requests.
