@@ -14,7 +14,7 @@ import { CargoSolver } from './manipulation.ts';
 import { missionCatalog, type MissionDefinition } from './missionCatalog.ts';
 import type { Pose } from './sensors.ts';
 import { AttachmentPhysics } from './attachmentPhysics.ts';
-import type { Attachments } from './attachments.ts';
+import type { Attachments, ToolAppearance } from './attachments.ts';
 import { obstaclesForBoard, tableWalls } from './boardGeometry.ts';
 
 type Motor = { position: number; velocity: number; command: number; target: number | null };
@@ -25,6 +25,9 @@ export type Part = {
     shape: 'box' | 'tire' | 'cart';
     position: number[];
     quaternion: number[];
+    appearance?: ToolAppearance;
+    decorative?: boolean;
+    hingeAngle?: number;
 };
 type Item = { body: Body; size: number[]; color: string; shape: Part['shape'] };
 type Slider = {
@@ -42,7 +45,7 @@ const box = (v: number[]) => new Box(new Vec3(v[0] / 2000, v[1] / 2000, v[2] / 2
 const rad = Math.PI / 180;
 const wrap = (a: number) => (((a % 360) + 540) % 360) - 180;
 
-// SI physics. Every visible solid is a collider; colored target rings are assessment overlays.
+// SI physics. Main solid outlines have colliders; small attachment hardware/holes are cosmetic.
 // These are ORIGINAL functional teaching proxies, not brick-accurate FLL mission mechanisms.
 export class CompetitionWorld {
     world = new World({ gravity: new Vec3(0, -9.81, 0), allowSleep: false });

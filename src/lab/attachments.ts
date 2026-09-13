@@ -17,12 +17,14 @@ export type ToolConfig = {
     torque: number;
 };
 export type Attachments = Record<'C' | 'D', ToolConfig>;
+export type ToolAppearance = 'beam' | 'curved-rail' | 'rack' | 'blade' | 'mount';
 export type ToolPart = {
     id: string;
     size: [number, number, number];
     position: [number, number, number];
     angle: number;
     color: string;
+    appearance?: ToolAppearance;
 };
 export function toolPreset(kind: ToolKind): ToolConfig {
     const common = {
@@ -157,41 +159,67 @@ export function toolParts(c: ToolConfig): ToolPart[] {
         size: ToolPart['size'],
         position: ToolPart['position'],
         color: string,
-        angle = 0
-    ) => parts.push({ id, size, position, color, angle });
-    const beam = (id: string, x: number, a: [number, number], b: [number, number], width = 8) => {
+        angle = 0,
+        appearance?: ToolAppearance
+    ) => parts.push({ id, size, position, color, angle, appearance });
+    const beam = (
+        id: string,
+        x: number,
+        a: [number, number],
+        b: [number, number],
+        width = 8,
+        thickness = 8,
+        appearance: ToolAppearance = 'beam'
+    ) => {
         const dy = b[0] - a[0],
             dz = b[1] - a[1];
         add(
             id,
-            [width, 8, Math.hypot(dy, dz)],
+            [width, thickness, Math.hypot(dy, dz)],
             [x, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
             '#27333a',
-            Math.atan2(dy, -dz)
+            Math.atan2(dy, -dz),
+            appearance
         );
     };
     if (c.kind === 'paddle') add('plate', [c.width, 8, c.length], [0, 0, -c.length / 2], '#ffc84a');
     if (c.kind === 'lift') {
-        for (const [i, x] of [-c.width / 2 + 4, c.width / 2 - 4].entries()) {
-            beam(`upper-${i}`, x, [0, 0], [-c.drop * 0.35, -c.length * 0.4]);
-            beam(`elbow-${i}`, x, [-c.drop * 0.35, -c.length * 0.4], [-c.drop, -c.length * 0.72]);
-            beam(`finger-${i}`, x, [-c.drop, -c.length * 0.72], [-c.drop, -c.length]);
+        const railWidth = Math.min(6, c.width / 3);
+        for (const [i, x] of [
+            -c.width / 2 + railWidth / 2,
+            c.width / 2 - railWidth / 2
+        ].entries()) {
+            beam(`upper-${i}`, x, [0, 0], [-c.drop * 0.84, -c.length * 0.46], railWidth, 10);
+            beam(
+                `elbow-${i}`,
+                x,
+                [-c.drop * 0.84, -c.length * 0.46],
+                [-c.drop, -c.length * 0.7],
+                railWidth,
+                10
+            );
         }
-        add('tip', [c.width, 6, 20], [0, -c.drop, -c.length + 10], '#27333a');
+        add('knuckle', [c.width, 8, 10], [0, -c.drop, -c.length * 0.7], '#27333a', 0, 'beam');
+        add(
+            'tip',
+            [c.width / 2, 6, c.length * 0.3],
+            [0, -c.drop, -c.length * 0.85],
+            '#27333a',
+            0,
+            'rack'
+        );
     }
     if (c.kind === 'dozer') {
-        // Segmented curved supports reproduce the arched outline without a decorative-only mesh.
-        const points: [number, number][] = [
-            [0, 0],
-            [12, -c.length * 0.25],
-            [0, -c.length * 0.55],
-            [-c.drop * 0.45, -c.length * 0.85],
-            [-c.drop, -c.length]
-        ];
+        // Smooth quarter-arch: horizontal at the hinge, vertical at the blade.
+        // Small matching solid segments retain the open gap between the two rails.
+        const points: [number, number][] = Array.from({ length: 17 }, (_, i) => {
+            const t = i / 16;
+            return [-c.drop * t * t, -c.length * (2 * t - t * t)];
+        });
         for (const [side, x] of [-c.width / 2 + 4, c.width / 2 - 4].entries())
             for (let i = 0; i < points.length - 1; i++)
-                beam(`arch-${side}-${i}`, x, points[i], points[i + 1]);
-        add('blade', [c.width, 45, 8], [0, -c.drop + 18, -c.length], '#66c5e5');
+                beam(`arch-${side}-${i}`, x, points[i], points[i + 1], 8, 14, 'curved-rail');
+        add('blade', [c.width, 45, 8], [0, -c.drop + 18, -c.length], '#66c5e5', 0, 'blade');
         add('blade-edge', [c.width, 8, 16], [0, -c.drop - 3, -c.length + 4], '#a33287');
     }
     return parts;

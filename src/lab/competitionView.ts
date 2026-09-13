@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { CompetitionSnapshot } from './competitionWorld.ts';
 import { findMission } from './missionCatalog.ts';
+import { createAttachmentMesh } from './attachmentView.ts';
 
 export function createCompetitionView() {
     const group = new THREE.Group();
@@ -37,7 +38,9 @@ export function createCompetitionView() {
             }
             return;
         }
-        const nextKey = JSON.stringify(state.parts.map((p) => [p.id, p.size, p.color, p.shape]));
+        const nextKey = JSON.stringify(
+            state.parts.map((p) => [p.id, p.size, p.color, p.shape, p.appearance])
+        );
         if (id !== state.id || geometryKey !== nextKey) {
             clear();
             id = state.id;
@@ -82,21 +85,23 @@ export function createCompetitionView() {
             let mesh = meshes.get(part.id);
             if (!mesh) {
                 const mat = new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.7 });
-                mesh =
-                    part.shape === 'tire'
-                        ? new THREE.Mesh(
-                              new THREE.CylinderGeometry(
-                                  part.size[0] / 2,
-                                  part.size[0] / 2,
-                                  part.size[1],
-                                  24
-                              ),
-                              [mat, new THREE.MeshStandardMaterial({ color: '#fafafa' }), mat]
-                          )
-                        : new THREE.Mesh(
-                              new THREE.BoxGeometry(part.size[0], part.size[1], part.size[2]),
-                              mat
-                          );
+                mesh = part.appearance
+                    ? createAttachmentMesh(part)
+                    : part.shape === 'tire'
+                      ? new THREE.Mesh(
+                            new THREE.CylinderGeometry(
+                                part.size[0] / 2,
+                                part.size[0] / 2,
+                                part.size[1],
+                                24
+                            ),
+                            [mat, new THREE.MeshStandardMaterial({ color: '#fafafa' }), mat]
+                        )
+                      : new THREE.Mesh(
+                            new THREE.BoxGeometry(part.size[0], part.size[1], part.size[2]),
+                            mat
+                        );
+                if (part.appearance) mat.dispose();
                 if (part.shape === 'cart') {
                     mesh.geometry.dispose();
                     const wheels = [-21, 21].map((z) =>
@@ -122,6 +127,8 @@ export function createCompetitionView() {
             }
             mesh.position.fromArray(part.position);
             mesh.quaternion.fromArray(part.quaternion);
+            const gear = mesh.getObjectByName('driven-gear');
+            if (gear) gear.rotation.x = ((part.hingeAngle ?? 0) * Math.PI) / 180;
         }
     }
     return { group, update, dispose: clear };

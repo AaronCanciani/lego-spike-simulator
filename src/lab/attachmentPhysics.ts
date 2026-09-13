@@ -1,4 +1,5 @@
 import { Body, Box, HingeConstraint, Material, Quaternion, Vec3, World } from 'cannon-es';
+import type { Part } from './competitionWorld.ts';
 import {
     toolParts,
     validateAttachments,
@@ -169,15 +170,16 @@ export class AttachmentPhysics {
             }
         }
     }
-    snapshot() {
-        return [...this.joints].flatMap(([port, j]) =>
-            j.parts.map((p) => {
+    snapshot(): Part[] {
+        return [...this.joints].flatMap(([port, j]) => {
+            const parts: Part[] = j.parts.map((p) => {
                 const q = new Quaternion();
                 q.setFromAxisAngle(new Vec3(1, 0, 0), p.angle);
                 return {
                     id: `attachment-${port}-${p.id}`,
                     size: p.size,
                     color: p.color,
+                    appearance: p.appearance,
                     shape: 'box' as const,
                     position: j.body
                         .pointToWorldFrame(
@@ -189,7 +191,21 @@ export class AttachmentPhysics {
                         .toArray(),
                     quaternion: j.body.quaternion.mult(q).toArray()
                 };
-            })
-        );
+            });
+            if (j.config.kind === 'lift' || j.config.kind === 'dozer') {
+                parts.push({
+                    id: `attachment-${port}-mount`,
+                    size: [j.config.kind === 'dozer' ? 48 : 32, 32, 36],
+                    color: '#343c40',
+                    shape: 'box',
+                    appearance: 'mount',
+                    decorative: true,
+                    hingeAngle: j.angle,
+                    position: this.chassis.pointToWorldFrame(j.pivot).scale(1000).toArray(),
+                    quaternion: this.chassis.quaternion.mult(j.mount).toArray()
+                });
+            }
+            return parts;
+        });
     }
 }

@@ -31,7 +31,7 @@ test('front lift outline stays 30% smaller with its mount unchanged', () => {
     assert.equal(dozer.width, 120);
     assert.equal(dozer.drop, 75);
     const tip = toolParts(lift).find((p) => p.id === 'tip');
-    assert.equal(tip.size[0], 16.8);
+    assert.equal(tip.size[0], 8.4); // A narrow central finger, not a full-width paddle.
     assert.equal(tip.position[1], -67.2);
     assert.equal(tip.position[2] - tip.size[2] / 2, -129.5);
 });
@@ -89,13 +89,25 @@ test('draft upgrade shortens untouched rear dozers on either port without changi
     }
 });
 
-test('stock pair places physical C dozer behind and D lift in front; every rendered part has a collider', () => {
+test('stock pair has matching solid colliders; fixed mounting details are explicitly cosmetic', () => {
     const w = rig();
     for (const [port, j] of w.attachments.joints) {
         assert.equal(j.body.shapes.length, toolParts(adbAttachments[port]).length);
         assert.equal(
-            w.snapshot().parts.filter((p) => p.id.startsWith(`attachment-${port}-`)).length,
+            w
+                .snapshot()
+                .parts.filter((p) => p.id.startsWith(`attachment-${port}-`) && !p.decorative)
+                .length,
             j.body.shapes.length
+        );
+        for (const [i, part] of j.parts.entries())
+            assert.deepEqual(
+                j.body.shapes[i].halfExtents.toArray(),
+                part.size.map((n) => n / 2000)
+            );
+        assert.equal(
+            w.snapshot().parts.find((p) => p.id === `attachment-${port}-mount`).decorative,
+            true
         );
     }
     const parts = w.snapshot().parts;
