@@ -8,6 +8,8 @@ Use Node 24, run `npm ci`, then `npm run dev -- --host 127.0.0.1`. Open the prin
 
 Load a LEGO Word Blocks `.llsp3` file. Programs are unpacked in the browser; Python projects are rejected. Run, pause, reset, playback speed, 5 ms single-tick stepping, execution highlighting, custom-block arguments and a resizable split view are available. Uploaded programs are not sent to a server. The bundled sample is the user's exploratory My Blocks project, not a successful navigation benchmark.
 
+The **Experiments** menu loads two purpose-built Scratch graphs: an open-loop two-second drive and a two-second proportional gyro controller (`steering = 3 × (0 − sensed yaw)`). Both use the regular interpreter, physical model and block viewer. Try identical settings, then raise effective wheel mismatch. Automated tests compare drift across four seeds and verify that feedback fails to correct drift when the sensed yaw is stuck at zero. This demonstrates the model's internal control-loop behavior, not hardware fidelity.
+
 ## What is implemented
 
 - Reuses upstream Scratch-to-Blockly conversion, block definitions and renderer. New bounded generator interpreter in `src/lab/engine.ts`; unsupported reachable blocks fail explicitly.
