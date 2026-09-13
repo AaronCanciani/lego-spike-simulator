@@ -24,6 +24,7 @@
     import type { Project } from './engine';
     import { editedProject } from './editorProject';
     import { editorToolbox } from './editorToolbox';
+    import { assetUrl } from './deployment';
     import {
         registerProcedureFlyout,
         type ProcedureCreateCallback
@@ -248,7 +249,7 @@
             toolbox: editorToolbox,
             disable: false,
             trashcan: false,
-            media: '/blockly/media/',
+            media: assetUrl('blockly/media/'),
             grid: { spacing: 24, length: 2, colour: '#cbd4dd', snap: false },
             zoom: { controls: false, wheel: true, startScale: 0.72, minScale: 0.25, maxScale: 1.5 },
             move: { scrollbars: true, drag: true, wheel: true }

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+    import { assetUrl } from './deployment';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { WIDTH, HEIGHT, defaultProfile } from './engine';
@@ -70,7 +71,7 @@
         referenceRequested = true;
         dispatch('modelstatus', 'Loading reference model…');
         try {
-            const response = await fetch('/models/DrivingBase3.mpd');
+            const response = await fetch(assetUrl('models/DrivingBase3.mpd'));
             const text = await response.text();
             if (!response.ok || !text.startsWith('0 FILE'))
                 throw new Error('Reference asset is not installed. Run npm run model:fetch.');
@@ -148,7 +149,7 @@
         }
         try {
             const img = new Image();
-            img.src = '/maps/FLL' + value + '.jpg';
+            img.src = assetUrl('maps/FLL' + value + '.jpg');
             await img.decode();
             if (disposed || request !== loadingId) return;
             const c = document.createElement('canvas');

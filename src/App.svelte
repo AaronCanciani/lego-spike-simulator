@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import JSZip from 'jszip';
     import ProgramView from './lab/ProgramView.svelte';
+    import { publicRelease, assetUrl } from './lab/deployment';
     import { blankProject, inspectForEditor } from './lab/editorProject';
     import WorldView from './lab/WorldView.svelte';
     import { drivingExample } from './lab/examples';
@@ -38,14 +39,14 @@
         showTrail = true,
         showSensors = false,
         placing = false,
-        map = '2024',
+        map = publicRelease ? 'practice' : '2024',
         speed = 1,
         split = 50;
     let profile: Profile = structuredClone(defaultProfile),
         realism = 'illustrative',
         lastFile: File | null = null,
         example = '';
-    let start = { x: -950, y: -330, heading: 180 },
+    let start = publicRelease ? { x: 0, y: -400, heading: 0 } : { x: -950, y: -330, heading: 180 },
         snapshot = new Engine({ targets: [] }).snapshot(),
         path: [number, number][] = [],
         info: ReturnType<typeof inspect> | null = null;
@@ -259,7 +260,11 @@
         if (!replaceAllowed()) return;
         loading = true;
         try {
-            const response = await fetch('/samples/new-code-blocks.json');
+            if (publicRelease) {
+                accept(drivingExample(true), 'Gyro feedback · 2 seconds');
+                return;
+            }
+            const response = await fetch(assetUrl('samples/new-code-blocks.json'));
             if (!response.ok) throw new Error('Sample program could not be loaded.');
             accept(await response.json(), 'New code blocks');
         } catch (e) {
@@ -538,7 +543,7 @@
     ><title>SPIKE Lab · Robot simulator</title><meta
         name="description"
         content="Watch your SPIKE Word Blocks drive a virtual Advanced Driving Base. Explore motion, sensing and repeatable robot experiments."
-    /><link rel="icon" href="/lab-icon.svg" /></svelte:head
+    /><link rel="icon" href={assetUrl('lab-icon.svg')} /></svelte:head
 >
 <svelte:window
     on:pointermove={resize}
@@ -555,7 +560,7 @@
 
 <div class="lab-shell">
     <header class="topbar">
-        <a class="brand" href="/" aria-label="SPIKE Lab home"
+        <a class="brand" href={assetUrl('')} aria-label="SPIKE Lab home"
             ><span class="brand-mark">S<span>·</span></span><span
                 >SPIKE<span class="brand-light">LAB</span></span
             ></a
@@ -574,9 +579,9 @@
                 disabled={busy || loading}
                 on:change={loadExample}
                 ><option value="">Experiments</option><option value="open">Open-loop drive</option
-                ><option value="gyro">Gyro feedback</option><option value="coral"
-                    >Coral Nursery · gyro route</option
-                ><option value="coral-open">Coral Nursery · open loop</option>
+                ><option value="gyro">Gyro feedback</option>{#if !publicRelease}<option
+                        value="coral">Coral Nursery · gyro route</option
+                    ><option value="coral-open">Coral Nursery · open loop</option>{/if}
                 <option value="sensor-color">Reflection · stop at line</option>
                 <option value="sensor-distance">Distance · stop before wall</option>
                 <option value="sensor-force">Force · stop on contact</option>
@@ -588,7 +593,9 @@
                 class="quiet"
                 disabled={busy || loading}
                 on:click={() => (lastFile ? loadFile(lastFile) : loadSample())}
-                title="Reopen the last uploaded program, or the original My Blocks sample"
+                title={publicRelease
+                    ? 'Reopen the last uploaded program, or the gyro example'
+                    : 'Reopen the last uploaded program, or the original My Blocks sample'}
                 >↻ <span>Reload</span></button
             ><button class="load-button" disabled={busy} on:click={() => fileInput.click()}
                 >＋ Load program</button
@@ -803,10 +810,10 @@
                     bind:value={map}
                     disabled={busy}
                     on:change={selectMap}
-                    ><option value="2024">SUBMERGED · 2024</option><option value="2023"
-                        >MASTERPIECE · 2023</option
-                    ><option value="practice">Calibration grid</option><option value="sensor-course"
-                        >Color & line course</option
+                    >{#if !publicRelease}<option value="2024">SUBMERGED · 2024</option><option
+                            value="2023">MASTERPIECE · 2023</option
+                        >{/if}<option value="practice">Calibration grid</option><option
+                        value="sensor-course">Color & line course</option
                     ></select
                 >
             </div>
@@ -953,7 +960,7 @@
             >Programs stay in this browser <span class="tiny-divider">·</span> Fixed 5 ms simulation
             clock</span
         ><a
-            href="https://github.com/alexandrehardy/lego-spike-simulator"
+            href="https://github.com/AaronCanciani/lego-spike-simulator/tree/spike-lab"
             target="_blank"
             rel="noreferrer">Built on open source ↗</a
         >
@@ -980,9 +987,9 @@
         <fieldset disabled={busy}>
             <label class="field-label"
                 >Robot appearance<select bind:value={appearance}
-                    ><option value="advanced">Advanced Driving Base · approximation</option><option
-                        value="reference">Imported reference build</option
-                    ><option value="cylinder">Diagnostic cylinder</option></select
+                    ><option value="advanced">Advanced Driving Base · approximation</option
+                    >{#if !publicRelease}<option value="reference">Imported reference build</option
+                        >{/if}<option value="cylinder">Diagnostic cylinder</option></select
                 ></label
             >
             <p class="small-note">

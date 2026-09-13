@@ -1,5 +1,7 @@
 # Reuse and asset provenance
 
+The GitHub Pages release uses an explicit asset allowlist: archived mats, the optional imported robot, and the personal sample below are not deployed. They remain local/reference files (and, where previously committed, repository files). See [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Application foundation
 
 Alexandre Hardy, [lego-spike-simulator](https://github.com/alexandrehardy/lego-spike-simulator), baseline `94b2cf8aa052642d7ce47662298e7d7bcce62fa4`. This fork retains its source and GPL-2.0 license in `COPYING.md`, including the Scratch converter and SPIKE Blockly UI. Three.js is MIT licensed; Blockly is Apache-2.0; dependency notices remain applicable.
