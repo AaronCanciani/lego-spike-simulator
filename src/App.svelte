@@ -4,6 +4,8 @@
     import ProgramView from './lab/ProgramView.svelte';
     import WorldView from './lab/WorldView.svelte';
     import { drivingExample } from './lab/examples';
+    import { sensorExample } from './lab/sensorExamples';
+    import { defaultSensors } from './lab/sensors';
     import { coralExample } from './lab/missionExample';
     import { coralMission, MissionMonitor } from './lab/mission';
     import {
@@ -34,7 +36,7 @@
         map = '2024',
         speed = 1,
         split = 50;
-    let profile: Profile = { ...defaultProfile },
+    let profile: Profile = structuredClone(defaultProfile),
         realism = 'illustrative',
         lastFile: File | null = null,
         example = '';
@@ -77,6 +79,7 @@
                   slip: 0,
                   gyroBias: 0,
                   gyroNoise: 0,
+                  sensorConfig: { ...profile.sensorConfig, errors: false },
                   response: 0.005
               }
             : profile;
@@ -86,7 +89,7 @@
         const px = Math.round((x / WIDTH + 0.5) * (mapCanvas.width - 1)),
             py = Math.round((0.5 - y / HEIGHT) * (mapCanvas.height - 1));
         if (px < 0 || py < 0 || px >= mapCanvas.width || py >= mapCanvas.height)
-            return { color: 0, reflection: 0 };
+            return { color: -1, reflection: 0 };
         let r = 0,
             g = 0,
             b = 0,
@@ -106,9 +109,10 @@
         b /= count;
         const high = Math.max(r, g, b),
             low = Math.min(r, g, b);
-        let color = 10;
+        let color = -1;
         if (high < 65) color = 0;
-        else if (high - low < 35) color = high < 170 ? 1 : 10;
+        else if (high - low < 35) color = high < 170 ? -1 : 10;
+        else if (r > g * 1.3 && b > g * 1.3) color = 1;
         else if (b > r * 1.15 && b > g * 1.05) color = 3;
         else if (r > g * 1.35 && r > b * 1.25) color = 9;
         else if (r > 150 && g > 125 && b < g * 0.7) color = 7;
@@ -126,6 +130,7 @@
             monitor = mission ? new MissionMonitor(start) : null;
             missionState = new MissionMonitor(start).snapshot();
             engine.colorAt = sampleColor;
+            engine.sampleSensors();
             accumulator = 0;
             error = '';
             update();
@@ -215,6 +220,36 @@
     function loadExample() {
         if (!example) return;
         mission = example.startsWith('coral');
+        if (example.startsWith('sensor-')) {
+            const kind = example.slice(7) as 'color' | 'distance' | 'force';
+            profile.sensorConfig = structuredClone(defaultSensors);
+            profile.sensorConfig.ports.B = {
+                kind,
+                forward: 100,
+                side: 0,
+                height: kind === 'color' ? 8 : 35
+            };
+            start = { x: 0, y: kind === 'color' ? -350 : -400, heading: 0 };
+            if (map !== 'practice') {
+                map = 'practice';
+                mapReady = false;
+            }
+            lastFile = null;
+            showSensors = true;
+            accept(
+                sensorExample(kind),
+                kind === 'color'
+                    ? 'Reflection · stop at the line'
+                    : kind === 'distance'
+                      ? 'Distance · stop before the wall'
+                      : 'Force · stop on probe contact'
+            );
+            announce(
+                'Port B is configured for this experiment. Sensor mounts and noise remain adjustable.'
+            );
+            example = '';
+            return;
+        }
         if (mission) {
             start = { ...coralMission.start };
             if (map !== '2024') {
@@ -309,6 +344,17 @@
         profile = { ...profile };
         reset();
     }
+    const sensorPorts = ['B', 'F'] as const;
+    function changeSensor(port: 'B' | 'F') {
+        const mount = profile.sensorConfig.ports[port];
+        Object.assign(mount, {
+            forward: 100,
+            side: mount.kind === 'color' ? (port === 'B' ? -45 : 45) : 0,
+            height: mount.kind === 'color' ? 8 : 35
+        });
+        profile = { ...profile };
+        reset();
+    }
     function resize(event: PointerEvent) {
         if (resizeStart)
             split = Math.max(30, Math.min(70, (event.clientX / window.innerWidth) * 100));
@@ -378,7 +424,10 @@
                 ><option value="">Experiments</option><option value="open">Open-loop drive</option
                 ><option value="gyro">Gyro feedback</option><option value="coral"
                     >Coral Nursery · gyro route</option
-                ><option value="coral-open">Coral Nursery · open loop</option></select
+                ><option value="coral-open">Coral Nursery · open loop</option>
+                <option value="sensor-color">Reflection · stop at line</option>
+                <option value="sensor-distance">Distance · stop before wall</option>
+                <option value="sensor-force">Force · stop on contact</option></select
             ><button
                 class="quiet"
                 disabled={busy || loading}
@@ -568,6 +617,7 @@
                     {placing}
                     {appearance}
                     motors={snapshot.motors}
+                    sensors={snapshot.sensors}
                     {profile}
                     {mission}
                     missionActivated={missionState.activated}
@@ -628,6 +678,30 @@
                         Boundary contact · wheels may still turn
                     </div>{/if}
             </div>
+            {#if showSensors}<div class="sensor-hud" aria-label="Live sensor readings">
+                    {#each Object.entries(snapshot.sensors) as [port, s]}
+                        <div>
+                            <strong>{port} · {s.kind}</strong>
+                            <span
+                                >{s.kind === 'color'
+                                    ? `${s.reflection}% · ${s.color === -1 ? 'no color' : 'color ' + s.color}`
+                                    : s.kind === 'distance'
+                                      ? s.distance === null
+                                          ? 'No echo'
+                                          : `${fmt(s.distance / 10)} cm`
+                                      : s.kind === 'force'
+                                        ? `${fmt(s.force)} N · ${s.pressed ? 'pressed' : 'released'}`
+                                        : 'Not connected'}</span
+                            >
+                            <small>{s.quality}</small>
+                        </div>
+                    {/each}
+                    <small
+                        >100 Hz · {realism === 'ideal'
+                            ? 'errors off'
+                            : 'research baseline, not calibrated'}</small
+                    >
+                </div>{/if}
             <div class="telemetry">
                 <div>
                     <span>SENSED YAW</span><strong>{fmt(snapshot.yaw, 0)}<small>°</small></strong>
@@ -755,7 +829,99 @@
                 The sample selects E+A. Port order affects direction. Check orientation against his
                 physical build.
             </p>
-            <h3>Explore imperfections</h3>
+            <h3>Sensors & mounting</h3>
+            <p class="small-note">
+                Stock B/F are downward color sensors at about 8 mm. Distance or force replaces a
+                color sensor; A/C/D/E remain motors. Optional mounts point forward and sense table
+                walls only.
+            </p>
+            {#each sensorPorts as port}
+                <div class="settings-grid">
+                    <label
+                        >Port {port}<select
+                            bind:value={profile.sensorConfig.ports[port].kind}
+                            on:change={() => changeSensor(port)}
+                        >
+                            <option value="color">Color / reflection</option><option
+                                value="distance">Ultrasonic distance</option
+                            ><option value="force">Force / touch probe</option><option value="none"
+                                >Disconnected</option
+                            >
+                        </select></label
+                    >
+                    <label
+                        >Height <span>mm</span><input
+                            type="number"
+                            min="0"
+                            max="150"
+                            bind:value={profile.sensorConfig.ports[port].height}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label
+                        >Forward offset <span>mm</span><input
+                            type="number"
+                            min="-200"
+                            max="200"
+                            bind:value={profile.sensorConfig.ports[port].forward}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label
+                        >Right offset <span>mm</span><input
+                            type="number"
+                            min="-200"
+                            max="200"
+                            bind:value={profile.sensorConfig.ports[port].side}
+                            on:change={setProfile}
+                        /></label
+                    >
+                </div>
+            {/each}
+            <p class="small-note">
+                Raise color sensors to 16 mm to compare black detection. Heights affect color
+                sensing; optional sensors use a flat, full-height wall model. The force offset is
+                its backplate; its probe extends another 8 mm.
+            </p>
+            <label class="range-label"
+                >Reflection noise <strong>±{profile.sensorConfig.reflectionNoise}%</strong><input
+                    type="range"
+                    min="0"
+                    max="10"
+                    step=".5"
+                    bind:value={profile.sensorConfig.reflectionNoise}
+                    on:change={setProfile}
+                /></label
+            >
+            <label class="range-label"
+                >Distance error envelope <strong>±{profile.sensorConfig.distanceError} mm</strong
+                ><input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="1"
+                    bind:value={profile.sensorConfig.distanceError}
+                    on:change={setProfile}
+                /></label
+            >
+            <label class="range-label"
+                >Missed echo assumption <strong
+                    >{Math.round(profile.sensorConfig.distanceDropout * 100)}%</strong
+                ><input
+                    type="range"
+                    min="0"
+                    max=".25"
+                    step=".01"
+                    bind:value={profile.sensorConfig.distanceDropout}
+                    on:change={setProfile}
+                /></label
+            >
+            <p class="small-note">
+                No echo reports −1; distance predicates are false. This is a provisional simulator
+                convention, pending a Word Blocks hardware test. Sensor event-start blocks and full
+                3D tilt/acceleration are not implemented.
+            </p>
+            <h3>Drive & gyro imperfections</h3>
             <label class="range-label"
                 >Residual motor mismatch<strong>{profile.motorMismatch}%</strong><input
                     type="range"
@@ -831,17 +997,18 @@
             <p>
                 Real mat artwork with estimated registration. The Coral Nursery exercise uses a
                 simplified tool-motion check, not contact physics or official scoring. C/D demo
-                tools follow encoders. Color sensors B/F sample the mat; distance sensing is not
-                supported yet.
+                tools follow physical motor angles. Color/reflection, distance, force/touch, yaw and
+                motor-angle readings have sampled models. Mat brightness is not measured
+                reflectance; noise distributions and probe mechanics still need calibration. The hub
+                uses an inertial gyro, not a compass.
             </p>
             {#if info?.unusedUnsupported.length}<p>
-                    This file has an unused distance-sensor routine. Running a program that calls it
-                    will show an unsupported-block error.
+                    Unused unsupported blocks: {info.unusedUnsupported.join(', ')}.
                 </p>{/if}
         </div>
         <div class="motor-readings">
-            <h3>Motor positions</h3>
-            {#each Object.entries(snapshot.motors) as [port, m]}<span
+            <h3>Reported motor positions · 100 Hz</h3>
+            {#each Object.entries(snapshot.encoders) as [port, m]}<span
                     >{port}<b>{fmt(m.position, 0)}°</b></span
                 >{/each}
         </div>

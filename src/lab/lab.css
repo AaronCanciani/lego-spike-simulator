@@ -783,6 +783,39 @@ select {
 .scope-note p {
     margin: 7px 0 0;
 }
+.sensor-hud {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex-shrink: 0;
+    column-gap: 16px;
+    border-top: 1px solid #42617d;
+    background: #102237ed;
+    color: #edf8ff;
+    padding: 10px 20px;
+    font-size: 12px;
+}
+.sensor-hud > small {
+    grid-column: 1 / -1;
+}
+.sensor-hud div {
+    display: grid;
+    gap: 3px;
+    padding-bottom: 9px;
+}
+.sensor-hud strong {
+    text-transform: uppercase;
+    color: #6ce7e0;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+}
+.sensor-hud span {
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+.sensor-hud small {
+    color: #b4c7d8;
+    font-size: 10px;
+}
 .motor-readings {
     display: flex;
     flex-wrap: wrap;

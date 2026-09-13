@@ -5,6 +5,8 @@
     import { WIDTH, HEIGHT, defaultProfile } from './engine';
     import { parseReferenceRig, updateRig, disposeRig, type RobotRig } from './robotRig';
     import { createMissionView } from './missionView';
+    import { createSensorView } from './sensorView';
+    import type { Reading } from './sensors';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
     export let map = '2024';
@@ -13,12 +15,14 @@
     export let placing = false;
     export let appearance = 'reference';
     export let motors: Record<string, { position: number }> = {};
+    export let sensors: Record<string, Reading> = {};
     export let profile = defaultProfile;
     export let mission = false;
     export let missionActivated = false;
     let cylinder: THREE.Group,
         reference: RobotRig | null = null;
     let missionView: ReturnType<typeof createMissionView>;
+    let sensorView: ReturnType<typeof createSensorView>;
     const dispatch = createEventDispatcher();
     let host: HTMLDivElement,
         renderer: THREE.WebGLRenderer,
@@ -231,15 +235,8 @@
             front.rotation.x = -Math.PI / 2;
             front.position.set(0, 104, -42);
             cylinder.add(front);
-            markers = new THREE.Group();
-            for (const x of [-45, 45]) {
-                const sensor = new THREE.Mesh(
-                    new THREE.SphereGeometry(7),
-                    new THREE.MeshBasicMaterial({ color: '#21e6e0' })
-                );
-                sensor.position.set(x, 6, -100);
-                markers.add(sensor);
-            }
+            sensorView = createSensorView();
+            markers = sensorView.group;
             robot.add(markers);
             scene.add(robot);
             missionView = createMissionView();
@@ -277,6 +274,7 @@
                 missionView.group.visible = mission && map === '2024';
                 missionView.update(missionActivated);
                 markers.visible = showSensors;
+                if (showSensors) sensorView.update(profile.sensorConfig, sensors);
                 trail.visible = showTrail;
                 if (oldLength !== path.length) {
                     oldLength = path.length;

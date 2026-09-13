@@ -6,7 +6,7 @@ This branch adds a student-facing, read-only program runner and 3D field to Alex
 
 Use Node 24, run `npm ci`, then `npm run dev -- --host 127.0.0.1`. Open the printed local URL. `npm run check`, `npm run build`, and `node --test src/lab/engine.test.mjs` verify the preview.
 
-Optional detailed reference robot: run `npm run model:fetch` before starting the app. `npm test` runs the complete runtime, mission and joint suite (20 tests when the optional local model is present). See [the Coral Nursery exercise](CORAL_MISSION.md) for the new mission route and its limitations.
+Optional detailed reference robot: run `npm run model:fetch` before starting the app. `npm test` runs the complete runtime, mission, joint and sensor suite. See [the Coral Nursery exercise](CORAL_MISSION.md) for the mission route and its limitations, and [sensor research and assumptions](SENSOR_MODELS.md) for the new sampled sensor models.
 
 Load a LEGO Word Blocks `.llsp3` file. Programs are unpacked in the browser; Python projects are rejected. Run, pause, reset, playback speed, 5 ms single-tick stepping, execution highlighting, custom-block arguments and a resizable split view are available. Uploaded programs are not sent to a server. The bundled sample is the user's exploratory My Blocks project, not a successful navigation benchmark.
 
@@ -18,15 +18,16 @@ The **Experiments** menu loads two purpose-built Scratch graphs: an open-loop tw
 - Fixed 5 ms simulation time, seeded experiments, separate encoder/true-pose/sensed-yaw values, motor response and residual gain mismatch, effective wheel mismatch, illustrative surface slip, gyro drift/noise/quantization/delay.
 - Three.js cylinder or imported LDraw reference build, encoder-animated wheels and demonstration C/D tools, orbit/overhead/robot cameras, trail, sensor markers, clickable placement, telemetry and editable robot profile.
 - Two archived field images and a generated practice field; only boundary walls affect motion.
-- The supplied 202-block file executes its reachable custom procedures. Its unused distance-sensor routine is reported unsupported.
+- The supplied 202-block file executes its reachable custom procedures. Distance reporters are now supported; calling its unused distance routine requires replacing the requested port's color sensor in settings.
+- Color/reflection, ultrasonic distance, force/touch and motor encoders sample at 100 Hz. Per-sensor seeded errors, finite color footprint, stock ADB low-height black-classification stress, distance range/echo limits, and a spring-probe contact approximation are implemented. A live overlay shows readings, search cones and probes. Three native Scratch sensor-stop experiments exercise them end to end.
 
 ## Important limitations
 
 The interpreter currently runs on the main thread, with bounded ticks and a 180-second simulated limit. This is not full Scratch scheduling or LEGO firmware timing. Gyro readings are modeled, not an ideal compass. True heading is inspector-only; programs read the simulated sensor.
 
-The drivetrain is a planar differential-drive approximation, not a traction/contact solver. Collisions clamp a 100 mm radius footprint to field boundaries. The Coral Nursery training exercise uses an alignment-and-tool-motion rubric and an animated proxy, not physical arm contacts or official scoring. There are no payload dynamics, lateral traction, battery effects or hardware-calibrated parameters yet. Color sensing uses simple image thresholds; distance sensing is not supported. Attachments C/D now have encoder-driven demonstration tools.
+The drivetrain is a planar differential-drive approximation, not a traction/contact solver. Collisions clamp a 100 mm radius footprint to field boundaries. The Coral Nursery training exercise uses an alignment-and-tool-motion rubric and an animated proxy, not physical arm contacts or official scoring. There are no payload dynamics, lateral traction, battery effects or hardware-calibrated parameters yet. Color sensing approximates reflectance from image brightness; optional distance/force sensors detect only table boundaries, not printed mission objects. No-echo Word Blocks behavior is a documented provisional convention. Sensor event hats, ambient/raw color, full 3D IMU and hub buttons remain unsupported. Attachments C/D have encoder-driven demonstration tools.
 
-Advanced Driving Base defaults use physical drive ports A/E and an approximately 87.95 mm wheel diameter. Track width 160 mm, motor polarity, sensor locations and all error values are starting assumptions. The sample selects E+A; that order is preserved and may reverse motion. Verify wiring and direction on the real build before interpreting results.
+Advanced Driving Base defaults use physical drive ports A/E and an approximately 87.95 mm wheel diameter. Track width 160 mm, motor polarity and horizontal sensor locations are starting assumptions; default 8 mm color height follows published ADB observations. Sensor ranges/resolutions/accuracy envelopes now follow LEGO specifications, but error distributions and gyro parameters remain unmeasured assumptions. The sample selects E+A; that order is preserved and may reverse motion. Verify wiring and direction on the real build before interpreting results.
 
 The field is 2362 × 1143 mm. The 2024 artwork is approximately registered between 171 mm side home strips; its crop and landmark coordinates are digitized estimates, not surveyed measurements. The 2023 image retains the initial whole-image fit. Do not use this preview for millimeter-accurate mission practice.
 

@@ -90,11 +90,11 @@ test('unknown reachable blocks are rejected; unused unsupported routines are rep
     assert.match(e.error, /unknown_block/);
     const unused = {
         targets: [
-            { blocks: { ...straight.targets[0].blocks, loose: block('flippersensors_distance') } }
+            { blocks: { ...straight.targets[0].blocks, loose: block('flippersensors_isTilted') } }
         ]
     };
     assert.deepEqual(inspect(unused).unsupported, []);
-    assert.deepEqual(inspect(unused).unusedUnsupported, ['flippersensors_distance']);
+    assert.deepEqual(inspect(unused).unusedUnsupported, ['flippersensors_isTilted']);
 });
 test('empty repeat-until loop yields and is stopped by simulated timeout', () => {
     const p = program({ go: block('control_repeat_until', { CONDITION: input(0) }) });

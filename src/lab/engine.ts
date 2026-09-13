@@ -1,5 +1,6 @@
 // Fixed-clock SPIKE Word Blocks runner. Rendering never advances this clock.
 // Steering and paired motor polarity follow the upstream Hardy VM conventions.
+import { SensorBank, defaultSensors, type SensorConfig } from './sensors.ts';
 export type Block = {
     opcode: string;
     next?: string;
@@ -31,6 +32,7 @@ export type Profile = {
     leftSign: number;
     rightSign: number;
     seed: number;
+    sensorConfig: SensorConfig;
 };
 export const defaultProfile: Profile = {
     wheel: 87.95,
@@ -45,7 +47,8 @@ export const defaultProfile: Profile = {
     right: 'E',
     leftSign: -1,
     rightSign: 1,
-    seed: 42
+    seed: 42,
+    sensorConfig: structuredClone(defaultSensors)
 };
 export const DT = 0.005;
 export const WIDTH = 2362,
@@ -119,6 +122,11 @@ const expressionOps = new Set([
     'flippersensors_isColor',
     'flippersensors_color',
     'flippersensors_reflectivity',
+    'flippersensors_isReflectivity',
+    'flippersensors_distance',
+    'flippersensors_isDistance',
+    'flippersensors_force',
+    'flippersensors_isPressed',
     'flippermoremotor_position',
     'flippermotor_absolutePosition',
     'flippermotor_speed'
@@ -133,7 +141,8 @@ const selectorOps = new Set([
     'flippermove_rotation-wheel',
     'flippersensors_color-sensor-selector',
     'flippersensors_color-selector',
-    'flippersensors_distance-sensor-selector'
+    'flippersensors_distance-sensor-selector',
+    'flippersensors_force-sensor-selector'
 ]);
 
 export function flatten(project: Project): Record<string, Block> {
@@ -222,10 +231,10 @@ export class Engine {
         color: 10,
         reflection: 90
     });
-    sensors: Record<string, { color: number; reflection: number }> = {
-        B: { color: 10, reflection: 90 },
-        F: { color: 10, reflection: 90 }
-    };
+    sensorBank: SensorBank;
+    get sensors() {
+        return this.sensorBank.readings;
+    }
     private noise = 0;
     private sampleHeading = 180;
     constructor(
@@ -263,7 +272,8 @@ export class Engine {
         )
             throw new Error('Choose a numeric start position and heading.');
         this.info = inspect(project);
-        this.profile = { ...profile };
+        this.profile = structuredClone(profile);
+        this.sensorBank = new SensorBank(profile.sensorConfig, profile.seed);
         this.seed = profile.seed >>> 0;
         Object.assign(this, start);
         this.sampleHeading = this.heading;
@@ -273,6 +283,9 @@ export class Engine {
         for (const target of project.targets)
             for (const [id, v] of Object.entries(target.variables || {})) this.variables[id] = v[1];
         this.path = [[this.x, this.y]];
+    }
+    sampleSensors() {
+        this.sensorBank.sample(this.tick, this, this.colorAt, this.motors);
     }
     random() {
         this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0;
@@ -298,6 +311,7 @@ export class Engine {
             t.generator = this.run(id, {}, t);
             return t;
         });
+        this.sampleSensors();
         this.state = 'running';
     }
     halt() {
@@ -353,13 +367,16 @@ export class Engine {
         if (
             op === 'flippersensors_isColor' ||
             op === 'flippersensors_color' ||
-            op === 'flippersensors_reflectivity'
+            op === 'flippersensors_reflectivity' ||
+            op === 'flippersensors_isReflectivity'
         ) {
             const port = String(v('PORT')),
-                sensor = this.sensors[port];
-            if (!sensor)
-                throw new Error(
-                    'No color sensor on port ' + port + '. Advanced Driving Base uses B and F.'
+                sensor = this.sensorBank.require(port, 'color');
+            if (op === 'flippersensors_isReflectivity')
+                return this.sensorCompare(
+                    sensor.reflection,
+                    n('VALUE'),
+                    this.field(b, 'COMPARATOR')
                 );
             return op === 'flippersensors_isColor'
                 ? sensor.color === Number(v('VALUE'))
@@ -367,15 +384,51 @@ export class Engine {
                   ? sensor.color
                   : sensor.reflection;
         }
+        if (op === 'flippersensors_distance' || op === 'flippersensors_isDistance') {
+            const sensor = this.sensorBank.require(String(v('PORT')), 'distance');
+            // Explicit simulator convention until Word Blocks no-echo behavior is captured on hardware.
+            if (sensor.distance === null) return op === 'flippersensors_distance' ? -1 : false;
+            const unit = this.field(b, 'UNIT');
+            const divisor =
+                unit === '%'
+                    ? 20
+                    : unit === 'cm'
+                      ? 10
+                      : ['in', 'inches'].includes(unit)
+                        ? 25.4
+                        : NaN;
+            if (!Number.isFinite(divisor)) throw new Error('Unsupported distance unit: ' + unit);
+            const distance = sensor.distance / divisor;
+            return op === 'flippersensors_distance'
+                ? distance
+                : this.sensorCompare(distance, n('VALUE'), this.field(b, 'COMPARATOR'));
+        }
+        if (op === 'flippersensors_force' || op === 'flippersensors_isPressed') {
+            const sensor = this.sensorBank.require(String(v('PORT')), 'force');
+            if (op === 'flippersensors_force')
+                return sensor.force * (this.field(b, 'UNIT') === '%' ? 10 : 1);
+            const option = this.field(b, 'OPTION');
+            return option === 'released'
+                ? !sensor.pressed
+                : option === 'hard-pressed'
+                  ? sensor.force > 5
+                  : sensor.pressed;
+        }
         if (op.startsWith('flippermotor_') || op === 'flippermoremotor_position') {
-            const m = this.motor(String(v('PORT')));
+            const port = String(v('PORT'));
+            this.motor(port);
+            const m = this.sensorBank.encoders[port];
+            if (!m) throw new Error('Motor sensor is not sampled yet.');
             return op.endsWith('speed')
-                ? m.velocity / 8.1
+                ? m.speed
                 : op.endsWith('absolutePosition')
                   ? ((m.position % 360) + 360) % 360
                   : m.position;
         }
         throw new Error('Unsupported expression: ' + op);
+    }
+    sensorCompare(a: number, b: number, comparator: string) {
+        return comparator === '<' ? a < b : comparator === '>' ? a > b : Math.abs(a - b) < 1e-9;
     }
     compare(a: any, b: any) {
         const x = Number(a),
@@ -560,6 +613,7 @@ export class Engine {
                 } else while ([...ports].some((p) => this.motor(p).target !== null)) yield;
             } else if (op === 'flippersensors_resetYaw') {
                 this.yawOffset = this.heading + this.drift;
+                this.sampleHeading = this.heading;
                 this.yaw = 0;
             } else if (op === 'flippersensors_resetTimer') this.timerStart = this.time;
             else if (op !== 'flipperevents_whenProgramStarts')
@@ -582,6 +636,7 @@ export class Engine {
             this.physics();
             this.tick++;
             this.time = this.tick * DT;
+            this.sampleSensors();
             if (this.threads.every((t) => t.done)) {
                 this.state = 'finished';
                 this.halt();
@@ -654,17 +709,6 @@ export class Engine {
             );
             this.sampleHeading = this.heading;
         }
-        if (this.tick % 8 === 0) {
-            const theta = (this.heading * Math.PI) / 180;
-            for (const [port, side] of [
-                ['B', -1],
-                ['F', 1]
-            ] as [string, number][])
-                this.sensors[port] = this.colorAt(
-                    this.x + Math.sin(theta) * 100 + Math.cos(theta) * side * 45,
-                    this.y + Math.cos(theta) * 100 - Math.sin(theta) * side * 45
-                );
-        }
         if (
             this.tick % 10 === 0 &&
             Math.hypot(this.x - this.path.at(-1)![0], this.y - this.path.at(-1)![1]) > 2
@@ -684,6 +728,7 @@ export class Engine {
             collision: this.collision,
             slip: this.slipNow,
             motors: structuredClone(this.motors),
+            encoders: structuredClone(this.sensorBank.encoders),
             active: this.threads.filter((t) => !t.done).map((t) => t.active),
             calls: this.threads[0]?.calls.slice() || [],
             args: { ...this.threads[0]?.args },
