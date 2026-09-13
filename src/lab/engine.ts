@@ -119,7 +119,7 @@ const expressionOps = new Set([
     'flippersensors_isColor',
     'flippersensors_color',
     'flippersensors_reflectivity',
-    'flippermotor_relativePosition',
+    'flippermoremotor_position',
     'flippermotor_absolutePosition',
     'flippermotor_speed'
 ]);
@@ -127,6 +127,7 @@ const selectorOps = new Set([
     'flippermotor_custom-icon-direction',
     'flippermotor_multiple-port-selector',
     'flippermotor_single-motor-selector',
+    'flippermoremotor_single-motor-selector',
     'flippermove_custom-icon-direction',
     'flippermove_movement-port-selector',
     'flippermove_rotation-wheel',
@@ -366,7 +367,7 @@ export class Engine {
                   ? sensor.color
                   : sensor.reflection;
         }
-        if (op.startsWith('flippermotor_')) {
+        if (op.startsWith('flippermotor_') || op === 'flippermoremotor_position') {
             const m = this.motor(String(v('PORT')));
             return op.endsWith('speed')
                 ? m.velocity / 8.1

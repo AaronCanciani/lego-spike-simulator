@@ -4,6 +4,8 @@
     import ProgramView from './lab/ProgramView.svelte';
     import WorldView from './lab/WorldView.svelte';
     import { drivingExample } from './lab/examples';
+    import { coralExample } from './lab/missionExample';
+    import { coralMission, MissionMonitor } from './lab/mission';
     import {
         Engine,
         defaultProfile,
@@ -51,6 +53,11 @@
         mapPixels: ImageData | null = null,
         mapReady = false;
     let readyMap = '';
+    let mission = false,
+        monitor: MissionMonitor | null = null,
+        missionState = new MissionMonitor(start).snapshot();
+    let appearance = 'reference',
+        modelStatus = 'Loading reference model…';
     let notice = '',
         noticeTimer: ReturnType<typeof setTimeout>;
     const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
@@ -59,6 +66,7 @@
         snapshot = engine.snapshot();
         path = engine.path.slice();
         steps = engine.trace.length;
+        if (monitor) missionState = monitor.snapshot();
     }
     function activeProfile() {
         return realism === 'ideal'
@@ -115,6 +123,8 @@
         if (!project) return;
         try {
             engine = new Engine(project, activeProfile(), start);
+            monitor = mission ? new MissionMonitor(start) : null;
+            missionState = new MissionMonitor(start).snapshot();
             engine.colorAt = sampleColor;
             accumulator = 0;
             error = '';
@@ -204,6 +214,26 @@
     }
     function loadExample() {
         if (!example) return;
+        mission = example.startsWith('coral');
+        if (mission) {
+            start = { ...coralMission.start };
+            if (map !== '2024') {
+                map = '2024';
+                mapReady = false;
+            }
+            lastFile = null;
+            accept(
+                coralExample(example === 'coral'),
+                example === 'coral'
+                    ? 'Coral Nursery · gyro route'
+                    : 'Coral Nursery · open-loop route'
+            );
+            announce(
+                'Training route: approach the cyan target, raise tool C, then return to the green launch area.'
+            );
+            example = '';
+            return;
+        }
         start = { x: 0, y: -400, heading: 0 };
         if (map !== 'practice') {
             map = 'practice';
@@ -236,6 +266,7 @@
             engine.start();
         } else engine.state = 'running';
         engine.step();
+        monitor?.observe(engine);
         if (engine.state === 'running') engine.state = 'paused';
         update();
     }
@@ -248,6 +279,7 @@
             let ticks = 0;
             while (accumulator >= DT && ticks++ < 100) {
                 engine.step();
+                monitor?.observe(engine);
                 accumulator -= DT;
             }
             update();
@@ -263,6 +295,7 @@
         reset();
     }
     function selectMap() {
+        if (map !== '2024') mission = false;
         mapReady = map === readyMap;
         reset();
     }
@@ -343,7 +376,9 @@
                 disabled={busy || loading}
                 on:change={loadExample}
                 ><option value="">Experiments</option><option value="open">Open-loop drive</option
-                ><option value="gyro">Gyro feedback</option></select
+                ><option value="gyro">Gyro feedback</option><option value="coral"
+                    >Coral Nursery · gyro route</option
+                ><option value="coral-open">Coral Nursery · open loop</option></select
             ><button
                 class="quiet"
                 disabled={busy || loading}
@@ -417,6 +452,28 @@
     {#if info?.unsupported.length}<div class="error-banner" role="alert">
             This program uses blocks not supported yet: {info.unsupported.join(', ')}
         </div>{/if}
+    {#if mission}
+        <section class="mission-brief" aria-label="Coral Nursery training mission">
+            <div>
+                <strong>M01 · Coral Nursery</strong><small
+                    >Approach 42.5 cm → lift C → reverse home · authored training route</small
+                >
+            </div>
+            <div class="mission-checks">
+                <span class:done={missionState.validLaunch}>① Launch</span><span
+                    class:done={missionState.aligned}>② Align</span
+                ><span class:done={missionState.activated}>③ Lift C</span><span
+                    class:done={missionState.returned}>④ Home</span
+                >
+            </div>
+            {#if missionState.returned}<strong role="status">Practice complete ✓</strong>{/if}
+            <a href={coralMission.rulebook} target="_blank" rel="noreferrer">Official mission ↗</a>
+            <small class="mission-caveat"
+                >Approximate landmarks and tool-contact check. No official scoring or other mission
+                collisions yet.</small
+            >
+        </section>
+    {/if}
     <main class="workspace" style={`--split:${split}%`}>
         <section class="code-panel" aria-label="Read-only program">
             <div class="panel-heading">
@@ -509,6 +566,12 @@
                     {showTrail}
                     {showSensors}
                     {placing}
+                    {appearance}
+                    motors={snapshot.motors}
+                    {profile}
+                    {mission}
+                    missionActivated={missionState.activated}
+                    on:modelstatus={(e) => (modelStatus = e.detail)}
                     on:mapready={fieldReady}
                     on:place={placement}
                     on:error={(e) => (error = e.detail)}
@@ -519,12 +582,22 @@
                             >{map === 'practice'
                                 ? 'Grid and color targets'
                                 : 'Mat + boundary walls'}</small
+                        ><small title={modelStatus}
+                            >{appearance === 'cylinder'
+                                ? 'Cylinder proxy'
+                                : modelStatus.startsWith('Animated')
+                                  ? 'Reference build · not exact ADB'
+                                  : 'Cylinder · reference loading/unavailable'}</small
                         ></span
                     >
                     <div class="camera-tools">
                         <button title="Overhead camera" on:click={() => world.overhead()}
                             >Top</button
-                        ><button title="Reset 3D camera" on:click={() => world.home()}>3D</button>
+                        ><button title="Reset 3D camera" on:click={() => world.home()}>3D</button
+                        ><button
+                            title="Inspect robot and moving tools"
+                            on:click={() => world.robotCloseup()}>Robot</button
+                        >
                     </div>
                 </div>
                 <div class="world-bottom">
@@ -613,6 +686,17 @@
             settings are editable starting assumptions.
         </p>
         <fieldset disabled={busy}>
+            <label class="field-label"
+                >Robot appearance<select bind:value={appearance}
+                    ><option value="reference">Imported reference build</option><option
+                        value="cylinder">Diagnostic cylinder</option
+                    ></select
+                ></label
+            >
+            <p class="small-note">
+                {modelStatus}. Reference body and wheel spacing differ from the Advanced Driving
+                Base; appearance does not change physics. C/D tools are illustrative.
+            </p>
             <label class="field-label"
                 >Simulation profile<select bind:value={realism} on:change={setProfile}
                     ><option value="illustrative">Illustrative imperfections</option><option
@@ -745,8 +829,9 @@
         <div class="scope-note">
             <strong>Preview boundaries</strong>
             <p>
-                Real mat artwork with estimated scale. No mission mechanisms yet. C/D attachment
-                motors run in telemetry. Color sensors B/F sample the mat; distance sensing is not
+                Real mat artwork with estimated registration. The Coral Nursery exercise uses a
+                simplified tool-motion check, not contact physics or official scoring. C/D demo
+                tools follow encoders. Color sensors B/F sample the mat; distance sensing is not
                 supported yet.
             </p>
             {#if info?.unusedUnsupported.length}<p>

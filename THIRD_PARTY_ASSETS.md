@@ -12,7 +12,7 @@ Gears' GPL-3.0 repository license does not establish ownership of FIRST/LEGO art
 
 ## Robot model reference (not bundled)
 
-Upstream README links [DrivingBase3.mpd](https://ahfiles.s3.amazonaws.com/robots/DrivingBase3.mpd). This hierarchical LDraw model was inspected for motor/part annotations only. Model-level and individual LDraw part rights must be checked before redistribution. It is a different assembly, not a verified model of the user's Advanced Driving Base.
+Upstream README links [DrivingBase3.mpd](https://ahfiles.s3.amazonaws.com/robots/DrivingBase3.mpd). The optional `model:fetch` script downloads this packed LDraw reference for local visualization, pinned to SHA-256 `f9cf37808820863094a74fe92e3700ef20ae811440348f1e8e64ee891aa82a01`. The downloaded file is excluded from git. Model-level and individual LDraw part rights must be checked before redistribution, including distribution inside a built application. It is a different assembly, not a verified model of the user's Advanced Driving Base. The adapter reuses Three.js's LDraw loader and this fork's upstream LDraw color palette. Added C/D tools and the training coral proxy are original simplified geometry.
 
 ## New preview assets
 

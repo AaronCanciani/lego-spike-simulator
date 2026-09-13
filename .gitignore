@@ -1,5 +1,9 @@
 node_modules
 
+# Locally fetched reference assets; redistribution rights not yet verified.
+/tmp/
+/static/models/DrivingBase3.mpd
+
 # Output
 .output
 .vercel

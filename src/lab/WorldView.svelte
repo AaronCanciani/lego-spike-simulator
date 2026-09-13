@@ -2,13 +2,23 @@
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { WIDTH, HEIGHT } from './engine';
+    import { WIDTH, HEIGHT, defaultProfile } from './engine';
+    import { parseReferenceRig, updateRig, disposeRig, type RobotRig } from './robotRig';
+    import { createMissionView } from './missionView';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
     export let map = '2024';
     export let showTrail = true;
     export let showSensors = false;
     export let placing = false;
+    export let appearance = 'reference';
+    export let motors: Record<string, { position: number }> = {};
+    export let profile = defaultProfile;
+    export let mission = false;
+    export let missionActivated = false;
+    let cylinder: THREE.Group,
+        reference: RobotRig | null = null;
+    let missionView: ReturnType<typeof createMissionView>;
     const dispatch = createEventDispatcher();
     let host: HTMLDivElement,
         renderer: THREE.WebGLRenderer,
@@ -36,6 +46,33 @@
         camera?.position.set(1300, 1900, 2000);
         controls?.target.set(0, 0, 0);
         controls?.update();
+    }
+    export function robotCloseup() {
+        camera?.position.set(pose.x + 320, 330, -pose.y + 380);
+        controls?.target.set(pose.x, 55, -pose.y);
+        controls?.update();
+    }
+    async function loadReference() {
+        dispatch('modelstatus', 'Loading reference model…');
+        try {
+            const response = await fetch('/models/DrivingBase3.mpd');
+            const text = await response.text();
+            if (!response.ok || !text.startsWith('0 FILE'))
+                throw new Error('Reference asset is not installed. Run npm run model:fetch.');
+            const rig = await parseReferenceRig(text);
+            if (disposed) {
+                disposeRig(rig);
+                return;
+            }
+            reference = rig;
+            robot.add(rig.group);
+            dispatch('modelstatus', 'Animated reference build · C/D demo tools');
+        } catch (e) {
+            dispatch(
+                'modelstatus',
+                e instanceof Error ? e.message : 'Reference model unavailable; showing cylinder.'
+            );
+        }
     }
     const material = (color: string) =>
         new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.12 });
@@ -89,7 +126,14 @@
             const c = document.createElement('canvas');
             c.width = img.width;
             c.height = img.height;
-            c.getContext('2d')!.drawImage(img, 0, 0);
+            const ctx = c.getContext('2d')!;
+            if (value === '2024') {
+                // Approximate digitization: remove the image's baked-in side
+                // margins, then place the mat between the 171 mm home strips.
+                ctx.fillStyle = '#33373b';
+                ctx.fillRect(0, 0, c.width, c.height);
+                ctx.drawImage(img, 208, 0, 1946, img.height, 171, 0, c.width - 342, c.height);
+            } else ctx.drawImage(img, 0, 0);
             applyTexture(new THREE.CanvasTexture(c), c);
         } catch (e) {
             dispatch('error', 'The field image could not be loaded. Choose another field.');
@@ -161,6 +205,8 @@
             ground.receiveShadow = true;
             scene.add(ground);
             robot = new THREE.Group();
+            cylinder = new THREE.Group();
+            robot.add(cylinder);
             const body = new THREE.Mesh(
                 new THREE.CylinderGeometry(93, 100, 95, 64),
                 material('#ffd346')
@@ -168,23 +214,23 @@
             body.position.y = 48;
             body.castShadow = true;
             body.receiveShadow = true;
-            robot.add(body);
+            cylinder.add(body);
             const lid = new THREE.Mesh(
                 new THREE.CylinderGeometry(82, 82, 5, 64),
                 material('#fff9dd')
             );
             lid.position.y = 98;
-            robot.add(lid);
+            cylinder.add(lid);
             const band = new THREE.Mesh(
                 new THREE.CylinderGeometry(101, 101, 16, 64),
                 material('#203346')
             );
             band.position.y = 20;
-            robot.add(band);
+            cylinder.add(band);
             const front = new THREE.Mesh(new THREE.ConeGeometry(15, 38, 3), material('#203346'));
             front.rotation.x = -Math.PI / 2;
             front.position.set(0, 104, -42);
-            robot.add(front);
+            cylinder.add(front);
             markers = new THREE.Group();
             for (const x of [-45, 45]) {
                 const sensor = new THREE.Mesh(
@@ -196,6 +242,10 @@
             }
             robot.add(markers);
             scene.add(robot);
+            missionView = createMissionView();
+            scene.add(missionView.group);
+            textures.push(...missionView.textures);
+            loadReference();
             const buffer = new Float32Array(15000 * 3),
                 geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.BufferAttribute(buffer, 3));
@@ -219,6 +269,13 @@
                 frame = requestAnimationFrame(animate);
                 robot.position.set(pose.x, 0, -pose.y);
                 robot.rotation.y = (-pose.heading * Math.PI) / 180;
+                cylinder.visible = appearance === 'cylinder' || !reference;
+                if (reference) {
+                    reference.group.visible = appearance === 'reference';
+                    updateRig(reference, motors, profile);
+                }
+                missionView.group.visible = mission && map === '2024';
+                missionView.update(missionActivated);
                 markers.visible = showSensors;
                 trail.visible = showTrail;
                 if (oldLength !== path.length) {
