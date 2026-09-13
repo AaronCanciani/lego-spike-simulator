@@ -2,6 +2,8 @@
 // Steering and paired motor polarity follow the upstream Hardy VM conventions.
 import { SensorBank, defaultSensors, type SensorConfig } from './sensors.ts';
 import { ManipulationWorld, type LiftConfig } from './manipulation.ts';
+import { CompetitionWorld } from './competitionWorld.ts';
+import type { MissionDefinition } from './missionCatalog.ts';
 export type Block = {
     opcode: string;
     next?: string;
@@ -204,6 +206,7 @@ export function inspect(project: Project) {
 }
 
 export class Engine {
+    competition: CompetitionWorld | null = null;
     manipulation: ManipulationWorld | null = null;
     profile: Profile;
     info: ReturnType<typeof inspect>;
@@ -243,8 +246,12 @@ export class Engine {
         project: Project,
         profile: Profile = defaultProfile,
         start = { x: -950, y: -330, heading: 180 },
-        lift: LiftConfig | null = null
+        lift: LiftConfig | null = null,
+        mission: MissionDefinition | null = null,
+        missionFriction = 0.45
     ) {
+        if (!Number.isFinite(missionFriction) || missionFriction < 0 || missionFriction > 1.5)
+            throw new Error('Mission contact friction must be between 0 and 1.5.');
         for (const key of [
             'wheel',
             'track',
@@ -286,7 +293,10 @@ export class Engine {
         for (const target of project.targets)
             for (const [id, v] of Object.entries(target.variables || {})) this.variables[id] = v[1];
         this.path = [[this.x, this.y]];
-        if (lift) this.manipulation = new ManipulationWorld(start, lift);
+        if (lift && mission)
+            throw new Error('Choose either a mission arm or the Cargo Harbor lift.');
+        if (mission) this.competition = new CompetitionWorld(mission, start, missionFriction);
+        else if (lift) this.manipulation = new ManipulationWorld(start, lift);
     }
     sampleSensors() {
         this.sensorBank.sample(
@@ -295,7 +305,11 @@ export class Engine {
             this.colorAt,
             this.motors,
             undefined,
-            this.manipulation ? this.manipulation.ray.bind(this.manipulation) : undefined
+            this.competition
+                ? this.competition.ray.bind(this.competition)
+                : this.manipulation
+                  ? this.manipulation.ray.bind(this.manipulation)
+                  : undefined
         );
     }
     random() {
@@ -666,7 +680,7 @@ export class Engine {
     }
     physics() {
         for (const [port, m] of Object.entries(this.motors)) {
-            if (this.manipulation && port === 'C') continue;
+            if ((this.manipulation || this.competition) && port === 'C') continue;
             const side = port === this.profile.left ? 1 : port === this.profile.right ? -1 : 0;
             const gain = 1 + (side * this.profile.motorMismatch) / 200;
             const tau =
@@ -705,7 +719,13 @@ export class Engine {
         let nx = clamp(this.x + dx, -WIDTH / 2 + 100, WIDTH / 2 - 100),
             ny = clamp(this.y + dy, -HEIGHT / 2 + 100, HEIGHT / 2 - 100);
         this.collision = Math.abs(nx - this.x - dx) > 0.01 || Math.abs(ny - this.y - dy) > 0.01;
-        if (this.manipulation) {
+        if (this.competition) {
+            const next = this.competition.step(DT, dx / DT, dy / DT, angular, this.motors.C);
+            nx = next.x;
+            ny = next.y;
+            this.heading = next.heading;
+            this.collision = this.competition.contact;
+        } else if (this.manipulation) {
             const next = this.manipulation.step(DT, dx / DT, dy / DT, angular, this.motors.C);
             nx = next.x;
             ny = next.y;
@@ -715,7 +735,7 @@ export class Engine {
         this.distance += Math.hypot(nx - this.x, ny - this.y);
         this.x = nx;
         this.y = ny;
-        if (!this.manipulation) this.heading += (angular * DT * 180) / Math.PI;
+        if (!this.manipulation && !this.competition) this.heading += (angular * DT * 180) / Math.PI;
         this.drift += p.gyroBias * DT;
         if (this.tick % 4 === 0) {
             this.yaw = Math.round(
@@ -753,7 +773,8 @@ export class Engine {
             calls: this.threads[0]?.calls.slice() || [],
             args: { ...this.threads[0]?.args },
             sensors: structuredClone(this.sensors),
-            manipulation: this.manipulation?.snapshot() ?? null
+            manipulation: this.manipulation?.snapshot() ?? null,
+            competition: this.competition?.snapshot() ?? null
         };
     }
 }

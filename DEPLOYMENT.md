@@ -12,9 +12,9 @@ The repository is public, so this uses free GitHub Pages hosting. No desktop ser
 
 The public build starts with the authored gyro example and generated calibration field. It offers Build/Run, student file imports, the generated color/line course, sensor experiments, and original ADB-style geometry. Programs and drafts run/stay in the visitor's browser; there is no shared cloud program storage.
 
-Only `blockly/`, `icons/`, `colours/`, the app icon, robots/404 files, and license/provenance notices are emitted from local static assets. `scripts/check-pages-build.mjs` rejects unexpected top-level output and requires essential assets.
+Only `blockly/`, `icons/`, `colours/`, the eight specifically named `maps/FLL2018.jpg` through `FLL2025.jpg` files, the app icon, robots/404 files, and license/provenance notices are emitted from local static assets. `scripts/check-pages-build.mjs` rejects unexpected output and requires essential assets. Reliability testing uses a bundled module worker, also served from the repository base path.
 
-The public website **does not bundle** the son's exploratory sample, archived competition mats, or optional imported LDraw robot. Mat/model redistribution remains unverified; those options and the mat-dependent Coral exercise are hidden in this build. Local files are unchanged. These exclusions concern the deployed website, not files already present in the public Git repository/history.
+The public website **does not bundle** the son's exploratory sample or optional imported LDraw robot. Archived competition mats are now explicitly included at the project owner's request; see the provenance notice. Eight maps, ten selected physical teaching missions and a separate wall-alignment drill are available. CARGO CONNECT and UNEARTHED currently offer map exploration, not additional scored missions. These exclusions concern the deployed website, not files already present in the public Git repository/history.
 
 ## Updating or troubleshooting
 

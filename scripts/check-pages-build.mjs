@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const allowed = new Set([
     'assets',
+    'maps',
     'index.html',
     'lab-icon.svg',
     '404.html',
@@ -17,13 +18,17 @@ const allowed = new Set([
 ]);
 for (const name of readdirSync('dist'))
     assert.ok(allowed.has(name), `Unreviewed public asset: ${name}`);
-for (const forbidden of ['maps', 'models', 'samples'])
+for (const forbidden of ['models', 'samples'])
     assert.equal(
         existsSync(path.join('dist', forbidden)),
         false,
         `${forbidden} must not be deployed`
     );
 const html = readFileSync('dist/index.html', 'utf8');
+assert.deepEqual(
+    readdirSync('dist/maps').sort(),
+    Array.from({ length: 8 }, (_, i) => `FLL${2018 + i}.jpg`)
+);
 assert.ok(
     html.includes('/lego-spike-simulator/lab-icon.svg'),
     'Favicon must use the Pages subpath'

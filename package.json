@@ -6,7 +6,7 @@
         "build": "vite build",
         "build:pages": "vite build --mode pages && node scripts/check-pages-build.mjs",
         "preview": "vite preview",
-        "test": "node --test src/lab/engine.test.mjs src/lab/mission.test.mjs src/lab/robotRig.test.mjs src/lab/advancedRig.test.mjs src/lab/sensors.test.mjs src/lab/colorExamples.test.mjs src/lab/editor.test.mjs src/lab/manipulation.test.mjs src/lab/cargoMap.test.mjs src/lab/studentSetup.test.mjs",
+        "test": "node --test src/lab/engine.test.mjs src/lab/mission.test.mjs src/lab/robotRig.test.mjs src/lab/advancedRig.test.mjs src/lab/sensors.test.mjs src/lab/colorExamples.test.mjs src/lab/editor.test.mjs src/lab/manipulation.test.mjs src/lab/cargoMap.test.mjs src/lab/studentSetup.test.mjs src/lab/competition.test.mjs",
         "model:fetch": "node scripts/fetch-reference-model.mjs",
         "check": "svelte-check --tsconfig ./svelte.check.tsconfig.json",
         "check:watch": "svelte-check --tsconfig ./svelte.check.tsconfig.json --watch",

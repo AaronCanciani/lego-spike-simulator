@@ -8,6 +8,10 @@
     import { createAdvancedRig, updateAdvancedRig, type AdvancedRig } from './advancedRig';
     import { createMissionView } from './missionView';
     import { createManipulationView } from './manipulationView';
+    import { createCompetitionView } from './competitionView';
+    import type { CompetitionSnapshot } from './competitionWorld';
+    export let competition: CompetitionSnapshot | null = null;
+    let competitionView: ReturnType<typeof createCompetitionView>;
     import type { ManipulationSnapshot } from './manipulation';
     export let manipulation: ManipulationSnapshot | null = null;
     let manipulationView: ReturnType<typeof createManipulationView>;
@@ -192,6 +196,11 @@
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         textures.push(texture);
         const m = mat.material as THREE.MeshStandardMaterial;
+        if (m.map) {
+            const index = textures.indexOf(m.map);
+            if (index >= 0) textures.splice(index, 1);
+            m.map.dispose();
+        }
         m.map = texture;
         m.needsUpdate = true;
         dispatch('mapready', c);
@@ -289,6 +298,8 @@
             scene.add(missionView.group);
             manipulationView = createManipulationView();
             scene.add(manipulationView.group);
+            competitionView = createCompetitionView();
+            scene.add(competitionView.group);
             textures.push(...missionView.textures);
             const buffer = new Float32Array(15000 * 3),
                 geometry = new THREE.BufferGeometry();
@@ -324,8 +335,9 @@
                 missionView.group.visible = mission && map === '2024';
                 missionView.update(missionActivated);
                 manipulationView.update(manipulation);
+                competitionView.update(competition);
                 const demoTools = advanced.group.getObjectByName('illustrative-attachments');
-                if (demoTools) demoTools.visible = !manipulation;
+                if (demoTools) demoTools.visible = !manipulation && !competition;
                 markers.visible = showSensors;
                 if (showSensors) sensorView.update(profile.sensorConfig, sensors);
                 trail.visible = showTrail;
@@ -389,6 +401,7 @@
                 (Array.isArray(m.material) ? m.material : [m.material]).forEach((v) => v.dispose());
         });
         textures.forEach((t) => t.dispose());
+        competitionView?.dispose();
         renderer?.dispose();
     });
     $: if (mat && map !== loadedMap) setMap(map);

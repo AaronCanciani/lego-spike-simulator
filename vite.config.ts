@@ -28,8 +28,16 @@ export default defineConfig(({ mode }) => ({
                             });
                     }
                 };
-                // Deliberate allowlist: never publish personal samples or unreviewed mat/model files.
+                // Mat publication explicitly requested by the project owner. Personal samples/models stay excluded.
                 for (const directory of ['blockly', 'icons', 'colours']) emitDirectory(directory);
+                for (let year = 2018; year <= 2025; year++) {
+                    const fileName = `maps/FLL${year}.jpg`;
+                    this.emitFile({
+                        type: 'asset',
+                        fileName,
+                        source: readFileSync(path.resolve('static', fileName))
+                    });
+                }
                 for (const file of ['lab-icon.svg', '404.html', 'robots.txt'])
                     this.emitFile({
                         type: 'asset',

@@ -214,7 +214,7 @@ export class SensorBank {
                 }
                 r.quality = r.valid
                     ? physicalRay
-                        ? 'Walls + physical payload'
+                        ? 'Physical walls + objects'
                         : 'Table walls only'
                     : 'No valid echo';
             } else if (mount.kind === 'force') {

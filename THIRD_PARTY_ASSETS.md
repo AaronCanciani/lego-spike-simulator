@@ -1,6 +1,6 @@
 # Reuse and asset provenance
 
-The GitHub Pages release uses an explicit asset allowlist: archived mats, the optional imported robot, and the personal sample below are not deployed. They remain local/reference files (and, where previously committed, repository files). See [DEPLOYMENT.md](DEPLOYMENT.md).
+The GitHub Pages release uses an explicit asset allowlist. The project owner explicitly requested publication of all archived mats on 2026-09-13 and accepted responsibility for their use. The optional imported robot and personal sample are still not deployed. This request does not change the copyright ownership or establish a new license. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Application foundation
 
@@ -8,9 +8,11 @@ Alexandre Hardy, [lego-spike-simulator](https://github.com/alexandrehardy/lego-s
 
 ## Competition mat images
 
-`static/maps/FLL2023.jpg` and `FLL2024.jpg` were obtained from [QuirkyCort/gears](https://github.com/QuirkyCort/gears), commit `ea031032f1d24ffb77506523361c55c0e08edfa1`, paths `public/textures/maps/FLL/FLL2023.jpg` and `public/textures/maps/FLL/FLL2024.jpg`. They depict FIRST LEGO League MASTERPIECE (2023) and SUBMERGED (2024) field artwork.
+`static/maps/FLL2018.jpg` through `FLL2025.jpg` were obtained from [QuirkyCort/gears](https://github.com/QuirkyCort/gears), commit `ea031032f1d24ffb77506523361c55c0e08edfa1`, under `public/textures/maps/FLL/`. These depict INTO ORBIT, CITY SHAPER, RePLAY, CARGO CONNECT, SUPERPOWERED, MASTERPIECE, SUBMERGED and UNEARTHED, respectively. The 2018-2025 images total about 2.8 MB. Some have photographed mission models baked into the image; these pixels are not extra physical objects. Color sensors sample the same image as the visual field.
 
-Gears' GPL-3.0 repository license does not establish ownership of FIRST/LEGO artwork or grant trademark rights. No Gears source code was copied. These reference images are included for this educational prototype; reproduction and distribution permissions for a wider release still need verification. Replace or obtain permission where required before distributing a product. Official challenge reference: [FIRST past challenges](https://www.firstinspires.org/resources/library/fll/past-challenges). No affiliation or endorsement is implied.
+Gears' GPL-3.0 repository license does not establish ownership of FIRST/LEGO artwork or grant trademark rights. No Gears source code was copied. Reproduction permissions have not been independently established. Official challenge reference: [FIRST past challenges](https://www.firstinspires.org/resources/library/fll/past-challenges). See [FIRST's materials-use policy](https://www.firstinspires.org/sites/default/files/uploads/resource_library/UseofUSFIRSTandLEGOGroupTrademarksandCopyrightedMaterials.pdf). FIRST and LEGO marks/artwork remain the property of their respective owners. This independent educational simulator is not affiliated with or endorsed by FIRST or LEGO.
+
+The functional mission proxies in `competitionWorld.ts` and `competitionView.ts` are original simplified geometry. They are not scans, extracted LEGO meshes, or complete recreations of official mission mechanisms. Their objectives are documented in `MISSION_PACK.md`.
 
 ## Robot model reference (not bundled)
 

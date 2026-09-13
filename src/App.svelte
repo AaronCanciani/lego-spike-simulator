@@ -1,11 +1,147 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, tick as flushUI } from 'svelte';
     import JSZip from 'jszip';
     import ProgramView from './lab/ProgramView.svelte';
     import { publicRelease, assetUrl } from './lab/deployment';
     import { blankProject, inspectForEditor } from './lab/editorProject';
     import WorldView from './lab/WorldView.svelte';
     import StudentRobotSetup from './lab/StudentRobotSetup.svelte';
+    import MissionPanel from './lab/MissionPanel.svelte';
+    import { archivedMaps, findMission } from './lab/missionCatalog';
+    import { missionProgram, type MissionStarter } from './lab/missionPrograms';
+    import type { TrialResult } from './lab/reliability';
+    let selectedMission = '',
+        practiceApproach = false,
+        missionFriction = 0.45;
+    let testing = false,
+        trialCount = 10,
+        trialResults: TrialResult[] = [];
+    let trialWorker: Worker | null = null;
+    function cancelTrials(clear = false) {
+        trialWorker?.terminate();
+        trialWorker = null;
+        testing = false;
+        if (clear) trialResults = [];
+    }
+    function setupSave() {
+        return { map, start, profile, realism, selectedMission, practiceApproach, missionFriction };
+    }
+    function chooseMission() {
+        const m = findMission(selectedMission);
+        liftEnabled = false;
+        mission = false;
+        practiceApproach = false;
+        missionFriction = 0.45;
+        if (m) {
+            map = m.map;
+            start = { ...m.start };
+            appearance = 'advanced';
+        }
+        mapReady = map === readyMap;
+        reset();
+        world?.home();
+        announce(
+            'Mission changed. Your program is unchanged. Open the brief for the objective and starter options.'
+        );
+    }
+    async function missionPosition(practice: boolean) {
+        const m = findMission(selectedMission);
+        if (!m) return;
+        practiceApproach = practice;
+        start = { ...(practice ? m.approach : m.start) };
+        reset();
+        await flushUI();
+        if (practice) world?.robotCloseup();
+        else world?.home();
+    }
+    function loadMissionStarter(kind: MissionStarter) {
+        if (!replaceAllowed()) return;
+        if (kind === 'wall') {
+            selectedMission = 'wall-alignment';
+            chooseMission();
+        }
+        const p = structuredClone(profile);
+        p.left = 'A';
+        p.right = 'E';
+        p.leftSign = -1;
+        p.rightSign = 1;
+        if (kind === 'line')
+            p.sensorConfig.ports.B = { kind: 'color', forward: 100, side: -45, height: 16 };
+        if (kind !== 'wall')
+            p.sensorConfig.ports.F = {
+                kind: kind === 'contact' ? 'force' : 'distance',
+                forward: kind === 'contact' ? 220 : 100,
+                side: 0,
+                height: 25
+            };
+        profile = p;
+        accept(
+            missionProgram(kind),
+            `${findMission(selectedMission)?.name ?? 'Mission'} · ${kind} starter`
+        );
+        switchMode('run');
+        saveDraft();
+        announce(
+            'Editable starter loaded with matching sensor wiring. It is a building block, not a full mission solution.'
+        );
+    }
+    function testReliability() {
+        if (!commitEdits() || !mapReady || !mapPixels || !project) return;
+        const m = findMission(selectedMission);
+        if (!m) return;
+        if (engine.state === 'running') engine.state = 'paused';
+        cancelTrials(true);
+        update();
+        testing = true;
+        try {
+            const worker = new Worker(new URL('./lab/reliability.worker.ts', import.meta.url), {
+                type: 'module'
+            });
+            trialWorker = worker;
+            worker.onmessage = (event) => {
+                if (trialWorker !== worker) return;
+                if (event.data.result) trialResults = [...trialResults, event.data.result];
+                if (event.data.error) {
+                    error = event.data.error;
+                    cancelTrials();
+                }
+                if (event.data.done) {
+                    cancelTrials();
+                    announce('Reliability trials finished. Replay any seed to investigate.');
+                }
+            };
+            worker.onerror = () => {
+                error = 'Reliability worker failed. Try a smaller program or reload the page.';
+                cancelTrials();
+            };
+            worker.postMessage({
+                project,
+                profile: activeProfile(),
+                start,
+                mission: m,
+                count: trialCount,
+                pixels: { width: mapPixels.width, height: mapPixels.height, data: mapPixels.data }
+            });
+        } catch (e) {
+            error = String(e);
+            cancelTrials();
+        }
+    }
+    function replayTrial(result: TrialResult) {
+        const keptResults = trialResults;
+        profile = structuredClone(result.profile);
+        realism = 'illustrative';
+        start = { ...result.start };
+        missionFriction = result.friction;
+        reset();
+        trialResults = keptResults;
+        mode = 'run';
+        engine.start();
+        update();
+        announce(
+            `Replaying run ${result.index} with the same seed, placement and contact friction.`
+        );
+    }
     let settingsTab: 'student' | 'advanced' = 'student';
     let settingsDrawer: HTMLElement;
     function openRobotSettings() {
@@ -93,6 +229,46 @@
         return liftEnabled ? { config: liftConfig, start, profile, realism, map } : null;
     }
     function restoreCargo(saved: any) {
+        if (saved.setup) {
+            const s = saved.setup;
+            if (
+                ![
+                    'practice',
+                    'sensor-course',
+                    'cargo-harbor',
+                    ...archivedMaps.map((m) => m.id)
+                ].includes(s.map) ||
+                !['ideal', 'illustrative'].includes(s.realism) ||
+                (s.selectedMission &&
+                    (!findMission(s.selectedMission) ||
+                        findMission(s.selectedMission)?.map !== s.map)) ||
+                !Number.isFinite(s.missionFriction) ||
+                s.missionFriction < 0 ||
+                s.missionFriction > 1.5
+            )
+                throw new Error('Unsupported saved mission settings.');
+            const lift = saved.cargo?.config ?? null;
+            new Engine(
+                { targets: [] },
+                s.profile,
+                s.start,
+                lift,
+                findMission(s.selectedMission),
+                s.missionFriction
+            );
+            map = s.map;
+            profile = structuredClone(s.profile);
+            start = { ...s.start };
+            realism = s.realism;
+            selectedMission = s.selectedMission || '';
+            practiceApproach = !!s.practiceApproach;
+            missionFriction = s.missionFriction;
+            liftEnabled = !!lift;
+            if (lift) liftConfig = { ...lift };
+            mapReady = map === readyMap;
+            mission = false;
+            return;
+        }
         if (!Object.hasOwn(saved, 'cargo')) return; // Older backups keep the selected field.
         if (saved.cargo === null) {
             liftEnabled = false;
@@ -105,7 +281,7 @@
                 'practice',
                 'sensor-course',
                 'cargo-harbor',
-                ...(publicRelease ? [] : ['2023', '2024'])
+                ...archivedMaps.map((m) => m.id)
             ].includes(c.map) ||
             !['ideal', 'illustrative'].includes(c.realism)
         )
@@ -130,7 +306,8 @@
                     version: 1,
                     name,
                     project: p,
-                    cargo: cargoSave()
+                    cargo: cargoSave(),
+                    setup: setupSave()
                 })
             );
             draftStatus = 'Draft saved in this browser';
@@ -139,6 +316,7 @@
         }
     }
     function edited() {
+        cancelTrials(true);
         dirty = true;
         unsaved = true;
         draftStatus = 'Saving draft…';
@@ -197,7 +375,8 @@
                                 version: 1,
                                 name,
                                 project: p,
-                                cargo: cargoSave()
+                                cargo: cargoSave(),
+                                setup: setupSave()
                             },
                             null,
                             2
@@ -250,9 +429,17 @@
         return samplePixels(mapPixels, x, y);
     }
     function reset() {
+        cancelTrials(true);
         if (!project) return;
         try {
-            engine = new Engine(project, activeProfile(), start, liftEnabled ? liftConfig : null);
+            engine = new Engine(
+                project,
+                activeProfile(),
+                start,
+                selectedMission ? null : liftEnabled ? liftConfig : null,
+                findMission(selectedMission),
+                missionFriction
+            );
             monitor = mission ? new MissionMonitor(start) : null;
             missionState = new MissionMonitor(start).snapshot();
             engine.colorAt = sampleColor;
@@ -373,6 +560,9 @@
             example = '';
             return;
         }
+        selectedMission = '';
+        practiceApproach = false;
+        missionFriction = 0.45;
         mission = example.startsWith('coral');
         liftEnabled = example === 'lift';
         if (liftEnabled) {
@@ -492,6 +682,7 @@
         example = '';
     }
     function toggle() {
+        if (testing) return;
         if (mode === 'build' && !switchMode('run')) return;
         if (!engine || !mapReady) return;
         if (info?.unsupported.length) return;
@@ -505,6 +696,7 @@
         update();
     }
     function step() {
+        if (testing) return;
         if (!engine || !mapReady) return;
         if (['ready', 'finished', 'error'].includes(engine.state)) {
             if (engine.state !== 'ready') reset();
@@ -541,6 +733,8 @@
         reset();
     }
     function selectMap() {
+        selectedMission = '';
+        practiceApproach = false;
         if (map !== '2024') mission = false;
         if (map === 'cargo-harbor') {
             liftEnabled = true;
@@ -556,6 +750,7 @@
         reset();
     }
     function placement(event: CustomEvent<{ x: number; y: number }>) {
+        if (selectedMission) practiceApproach = true;
         start = { ...start, ...event.detail };
         placing = false;
         reset();
@@ -610,11 +805,12 @@
         frame = requestAnimationFrame(tick);
     });
     onDestroy(() => {
+        cancelTrials();
         cancelAnimationFrame(frame);
         clearTimeout(noticeTimer);
         clearTimeout(draftTimer);
     });
-    $: busy = snapshot.state === 'running';
+    $: busy = snapshot.state === 'running' || testing;
     $: status =
         snapshot.state === 'ready'
             ? 'Ready to run'
@@ -715,8 +911,15 @@
             <button
                 class="run-button"
                 on:click={toggle}
-                disabled={loading || !mapReady || (mode === 'run' && !!info?.unsupported.length)}
-                >{busy ? 'Ⅱ Pause' : '▶ Run'}</button
+                disabled={testing ||
+                    loading ||
+                    !mapReady ||
+                    (mode === 'run' && !!info?.unsupported.length)}
+                >{testing
+                    ? 'Testing…'
+                    : snapshot.state === 'running'
+                      ? 'Ⅱ Pause'
+                      : '▶ Run'}</button
             ><button
                 class="icon-button"
                 aria-label="Step one simulation tick"
@@ -746,9 +949,11 @@
         <div class="run-status" aria-live="polite">
             <span class:running={busy} class="status-dot"></span>{loading
                 ? 'Loading program…'
-                : mode === 'build' && dirty
-                  ? 'Edits ready to test'
-                  : status}<span class="clock">{fmt(snapshot.time, 2)} s</span>
+                : testing
+                  ? 'Testing reliability…'
+                  : mode === 'build' && dirty
+                    ? 'Edits ready to test'
+                    : status}<span class="clock">{fmt(snapshot.time, 2)} s</span>
         </div>
         <button
             class="profile-button"
@@ -852,7 +1057,7 @@
                     >{snapshot.calls.length ? 'INSIDE CUSTOM BLOCK' : 'EXECUTION'}</span
                 ><strong
                     >{snapshot.calls.at(-1) ||
-                        (busy
+                        (snapshot.state === 'running'
                             ? 'Following the main program'
                             : snapshot.state === 'finished'
                               ? 'All start scripts have finished'
@@ -901,14 +1106,30 @@
                     bind:value={map}
                     disabled={busy}
                     on:change={selectMap}
-                    >{#if !publicRelease}<option value="2024">SUBMERGED · 2024</option><option
-                            value="2023">MASTERPIECE · 2023</option
-                        >{/if}<option value="cargo-harbor">Cargo Harbor · delivery mission</option
+                    >{#each archivedMaps as field}<option value={field.id}
+                            >{field.name} · {field.id}</option
+                        >{/each}<option value="cargo-harbor">Cargo Harbor · delivery mission</option
                     ><option value="practice">Calibration grid</option><option value="sensor-course"
                         >Color & line course</option
                     ></select
                 >
             </div>
+            <MissionPanel
+                running={snapshot.state === 'running'}
+                bind:selected={selectedMission}
+                {busy}
+                {testing}
+                state={snapshot.competition}
+                results={trialResults}
+                bind:trialCount
+                practice={practiceApproach}
+                on:choose={chooseMission}
+                on:position={(e) => missionPosition(e.detail)}
+                on:starter={(e) => loadMissionStarter(e.detail)}
+                on:test={testReliability}
+                on:cancel={() => cancelTrials()}
+                on:replay={(e) => replayTrial(e.detail)}
+            />
             {#if map === 'cargo-harbor'}
                 <div class="mission-brief" aria-label="Cargo Harbor mission">
                     <details>
@@ -951,6 +1172,7 @@
                     {mission}
                     missionActivated={missionState.activated}
                     manipulation={snapshot.manipulation}
+                    competition={snapshot.competition}
                     on:modelstatus={(e) => (modelStatus = e.detail)}
                     on:mapready={fieldReady}
                     on:place={placement}
@@ -965,19 +1187,21 @@
                               : map === 'practice' || map === 'sensor-course'
                                 ? 'PRACTICE FIELD'
                                 : 'FLL CHALLENGE'}<small
-                            >{snapshot.manipulation
-                                ? snapshot.manipulation.delivered
-                                    ? '✓ Delivered & resting'
-                                    : snapshot.manipulation.stalled
-                                      ? 'Lift stalled · check load / travel'
-                                      : snapshot.manipulation.lifted
-                                        ? 'Payload off the floor'
-                                        : 'Deliver to the green zone'
-                                : map === 'sensor-course'
-                                  ? 'Color markers + curved line'
-                                  : map === 'practice'
-                                    ? 'Grid and color targets'
-                                    : 'Mat + boundary walls'}</small
+                            >{snapshot.competition
+                                ? snapshot.competition.message
+                                : snapshot.manipulation
+                                  ? snapshot.manipulation.delivered
+                                      ? '✓ Delivered & resting'
+                                      : snapshot.manipulation.stalled
+                                        ? 'Lift stalled · check load / travel'
+                                        : snapshot.manipulation.lifted
+                                          ? 'Payload off the floor'
+                                          : 'Deliver to the green zone'
+                                  : map === 'sensor-course'
+                                    ? 'Color markers + curved line'
+                                    : map === 'practice'
+                                      ? 'Grid and color targets'
+                                      : 'Mat + boundary walls'}</small
                         ><small title={modelStatus}
                             >{snapshot.manipulation
                                 ? `Lift C · ${fmt(snapshot.manipulation.height, 0)} mm · inspector truth`
@@ -1140,6 +1364,12 @@
         </div>
         {#if settingsTab === 'student'}
             <div id="student-settings-panel" role="tabpanel" aria-labelledby="student-settings-tab">
+                {#if selectedMission}
+                    <p class="student-intro">
+                        Mission tool: port C lifts the yellow paddle. Choosing the cargo lift below
+                        leaves this mission. D is a demonstration tool only.
+                    </p>
+                {/if}
                 <StudentRobotSetup
                     bind:profile
                     bind:liftEnabled
@@ -1147,6 +1377,7 @@
                     on:sensorchange={(e) => changeSensor(e.detail)}
                     on:change={setProfile}
                     on:attachmentchange={() => {
+                        if (liftEnabled) selectedMission = '';
                         if (liftEnabled) appearance = 'advanced';
                         reset();
                     }}
@@ -1214,6 +1445,7 @@
                             type="checkbox"
                             bind:checked={liftEnabled}
                             on:change={() => {
+                                if (liftEnabled) selectedMission = '';
                                 if (liftEnabled) appearance = 'advanced';
                                 reset();
                             }}

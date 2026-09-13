@@ -50,7 +50,7 @@ const vector = (v: number[]) => new Vec3(...(v.map((n) => n / 1000) as [number, 
 // Give its friction equations an impulse budget mu*m*g*dt, shared across the
 // manifold, so changing timestep/contact count doesn't create sticky cargo.
 // Normal load is a resting-weight approximation, not a tire/contact load model.
-class CargoSolver extends GSSolver {
+export class CargoSolver extends GSSolver {
     friction: number;
     constructor(friction: number) {
         super();
