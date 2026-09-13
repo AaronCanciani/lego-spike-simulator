@@ -18,6 +18,8 @@ The **Experiments** menu loads two purpose-built Scratch graphs: an open-loop tw
 
 ## What is implemented
 
+The student playground has no persistent telemetry strip. Sensed yaw, true heading, distance traveled and wheel slip are live read-only diagnostics under **My Robot → Advanced**, leaving more room for the 3D field. The optional student sensor overlay remains available.
+
 **My Robot** opens student setup first: side-by-side B/F sensor cards, optional mounting details, one safe A/E wiring selector, and a cargo-attachment choice. **Advanced — Teacher / developer** holds simulation profiles, geometry calibration, slip, gyro drift/noise, motor mismatch, sensor error assumptions and diagnostics. Changing tabs does not change configuration; reopening the drawer defaults to the student tab. Advanced is an organizational separation, not a password or access-control boundary. Configuration is disabled during a running program.
 
 **Cargo lab · lift & deliver** adds the first physical payload and powered attachment: pushing, gravity, supported carrying, release, friction, overload stalls and a contact-based delivery zone. It has 16 dedicated tests. The attachment is an illustrative linear fork lift; lateral attachment loads do not yet feed back into the chassis. See [CARGO_LAB.md](CARGO_LAB.md) for exact scope and limits.

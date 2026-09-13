@@ -1284,26 +1284,6 @@
                             : 'research baseline, not calibrated'}</small
                     >
                 </div>{/if}
-            <div class="telemetry">
-                <div>
-                    <span>SENSED YAW</span><strong>{fmt(snapshot.yaw, 0)}<small>°</small></strong>
-                </div>
-                <div>
-                    <span>TRUE HEADING</span><strong
-                        >{fmt(wrap(snapshot.heading), 1)}<small>°</small></strong
-                    >
-                </div>
-                <div>
-                    <span>TRAVELED</span><strong
-                        >{fmt(snapshot.distance / 10, 1)}<small>cm</small></strong
-                    >
-                </div>
-                <div>
-                    <span>WHEEL SLIP</span><strong
-                        >{fmt(snapshot.slip * 100, 1)}<small>%</small></strong
-                    >
-                </div>
-            </div>
             {#if snapshot.variables[resultVariable]}<div class="sensor-outcome" role="status">
                     {snapshot.variables[resultVariable]}
                 </div>{/if}
@@ -1398,6 +1378,27 @@
                     Two large drive motors, two attachment motors and two color sensors. Geometry
                     and error settings are editable starting assumptions.
                 </p>
+                <section class="simulation-diagnostics" aria-label="Live simulation diagnostics">
+                    <h3>Live simulation diagnostics</h3>
+                    <dl>
+                        <div>
+                            <dt>Sensed yaw</dt>
+                            <dd>{fmt(snapshot.yaw, 0)}°</dd>
+                        </div>
+                        <div>
+                            <dt>True heading</dt>
+                            <dd>{fmt(wrap(snapshot.heading), 1)}°</dd>
+                        </div>
+                        <div>
+                            <dt>Traveled</dt>
+                            <dd>{fmt(snapshot.distance / 10, 1)} cm</dd>
+                        </div>
+                        <div>
+                            <dt>Wheel slip</dt>
+                            <dd>{fmt(snapshot.slip * 100, 1)}%</dd>
+                        </div>
+                    </dl>
+                </section>
                 <fieldset disabled={busy}>
                     <label class="field-label"
                         >Robot appearance<select bind:value={appearance} disabled={liftEnabled}

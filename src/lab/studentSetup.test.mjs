@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compile, preprocess } from 'svelte/compiler';
+import { compile, preprocess, parse } from 'svelte/compiler';
 import { transform, build } from 'esbuild';
 import { defaultProfile } from './engine.ts';
 
@@ -46,4 +46,26 @@ test('student equipment changes are disabled during a run', () => {
     const { html } = Setup.render({ profile: structuredClone(defaultProfile), busy: true });
     assert.match(html, /<fieldset disabled/);
     assert.match(html, /Pause the run/);
+});
+test('live simulation diagnostics appear only inside the Advanced settings panel', async () => {
+    const app = readFileSync(new URL('../App.svelte', import.meta.url), 'utf8');
+    const processedApp = await preprocess(app, {
+        script: async ({ content }) => transform(content, { loader: 'ts' })
+    });
+    const tree = parse(processedApp.code).html;
+    const attribute = (node, name) =>
+        node.attributes?.find((a) => a.name === name)?.value?.[0]?.data;
+    const found = [];
+    function visit(node, ancestors = []) {
+        if (!node || typeof node !== 'object') return;
+        if (attribute(node, 'aria-label') === 'Live simulation diagnostics') found.push(ancestors);
+        for (const child of Object.values(node)) {
+            if (Array.isArray(child)) child.forEach((c) => visit(c, [...ancestors, node]));
+            else if (child && typeof child === 'object') visit(child, [...ancestors, node]);
+        }
+    }
+    visit(tree);
+    assert.equal(found.length, 1);
+    assert.ok(found[0].some((node) => attribute(node, 'id') === 'advanced-settings-panel'));
+    assert.doesNotMatch(app, /class="telemetry"/);
 });
