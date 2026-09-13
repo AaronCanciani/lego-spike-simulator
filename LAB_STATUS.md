@@ -1,0 +1,45 @@
+# SPIKE Lab — working preview
+
+This branch adds a student-facing, read-only program runner and 3D field to Alexandre Hardy's simulator. It is an early compatibility and teaching prototype, not a calibrated digital twin or complete LEGO runtime.
+
+## Try it
+
+Use Node 24, run `npm ci`, then `npm run dev -- --host 127.0.0.1`. Open the printed local URL. `npm run check`, `npm run build`, and `node --test src/lab/engine.test.mjs` verify the preview.
+
+Load a LEGO Word Blocks `.llsp3` file. Programs are unpacked in the browser; Python projects are rejected. Run, pause, reset, playback speed, 5 ms single-tick stepping, execution highlighting, custom-block arguments and a resizable split view are available. Uploaded programs are not sent to a server. The bundled sample is the user's exploratory My Blocks project, not a successful navigation benchmark.
+
+## What is implemented
+
+- Reuses upstream Scratch-to-Blockly conversion, block definitions and renderer. New bounded generator interpreter in `src/lab/engine.ts`; unsupported reachable blocks fail explicitly.
+- Fixed 5 ms simulation time, seeded experiments, separate encoder/true-pose/sensed-yaw values, motor response and residual gain mismatch, effective wheel mismatch, illustrative surface slip, gyro drift/noise/quantization/delay.
+- Three.js cylinder, orbit and overhead cameras, trail, sensor markers, clickable placement, telemetry and editable robot profile.
+- Two archived field images and a generated practice field; only boundary walls affect motion.
+- The supplied 202-block file executes its reachable custom procedures. Its unused distance-sensor routine is reported unsupported.
+
+## Important limitations
+
+The interpreter currently runs on the main thread, with bounded ticks and a 180-second simulated limit. This is not full Scratch scheduling or LEGO firmware timing. Gyro readings are modeled, not an ideal compass. True heading is inspector-only; programs read the simulated sensor.
+
+The drivetrain is a planar differential-drive approximation, not a traction/contact solver. Collisions clamp a 100 mm radius footprint to field boundaries. There are no mission mechanisms, arm contacts, payload dynamics, lateral traction, battery effects or hardware-calibrated parameters yet. Color sensing uses simple image thresholds; distance sensing is not supported. Attachments C/D have encoder telemetry but no visual mechanism yet.
+
+Advanced Driving Base defaults use physical drive ports A/E and an approximately 87.95 mm wheel diameter. Track width 160 mm, motor polarity, sensor locations and all error values are starting assumptions. The sample selects E+A; that order is preserved and may reverse motion. Verify wiring and direction on the real build before interpreting results.
+
+Mat images are fitted to 2362 × 1143 mm; crop, margins and registration have not been verified. Do not use this preview for millimeter-accurate mission practice.
+
+## Reusable animated models
+
+Upstream loads hierarchical LDraw `.ldr`/`.mpd`, not just flattened meshes. Its linked `DrivingBase3.mpd` contains individual parts, `!SPIKE_PORT` and `!SPIKE_GEARING` annotations. Inspection on 2026-09-13 found drive wheels associated with C/D, unlike this robot's A/E profile. This example is not the Advanced Driving Base Assembly. The upstream `VM.turnMotor` computes wheel travel; it does not itself rotate the rendered wheel parts.
+
+Reuse this hierarchy through a Three.js LDraw adapter or a prepared glTF asset. Preserve separate named wheel and attachment groups, axle/pivot positions, rotation axes, motor port, polarity, gear ratio and rest transform. Animate from encoder angle, never from distance traveled, so wheels can spin during slip or wall contact. Arms require grouping all rigidly attached bricks around their joint; identifying the motor alone is insufficient. Gear trains/linkages and contact bodies need explicit configuration. Visual detail must remain independent of the collision model.
+
+Before bundling a robot model, verify the exact assembly and asset redistribution notices. The externally linked example was inspected but is not included in this branch. Next model milestone: verified Advanced Driving Base hierarchy, two animated drive wheels and configurable C/D joints; retain the cylinder as a diagnostic view.
+
+## Next stages
+
+1. Expand opcode, procedure and scheduler conformance tests against LEGO exports and hardware.
+2. Worker-isolated runtime, independent randomness streams, run recording and block-level stepping.
+3. Verified field registration and rigid-body/contact experiments, animated robot adapter.
+4. Hardware calibration: straight runs, turns, encoder-versus-distance, stationary gyro and repeated surface trials. Fit distributions, not one lucky run.
+5. Multiple seeded trials, reliability comparisons and mission mechanisms.
+
+See `THIRD_PARTY_ASSETS.md` for sources and rights caveats. Preserve upstream `COPYING.md` and notices.

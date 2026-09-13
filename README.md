@@ -1,3 +1,7 @@
+# SPIKE Lab fork
+
+This branch contains a new split-screen student simulator preview. Start with [the preview guide and limitations](LAB_STATUS.md) and [asset provenance](THIRD_PARTY_ASSETS.md). The original upstream overview follows.
+
 Welcome to the lego-spike-simulator project. The aim is to provide
 an environment where LEGO spike robots can be simulated and the
 code tested before uploading to a real LEGO spike robot.

@@ -39,12 +39,14 @@
         "@blockly/field-colour": "^5.0.9",
         "@blockly/field-grid-dropdown": "^5.0.9",
         "@blockly/zoom-to-fit": "^6.0.9",
+        "@types/three": "^0.186.0",
         "blockly": "^11.1.1",
         "file-saver": "^2.0.5",
         "flowbite": "^2.5.2",
         "flowbite-svelte": "^0.47.3",
         "flowbite-svelte-icons": "^1.6.2",
         "jszip": "^3.10.1",
-        "scratch-parser": "^5.2.1"
+        "scratch-parser": "^5.2.1",
+        "three": "^0.186.0"
     }
 }
