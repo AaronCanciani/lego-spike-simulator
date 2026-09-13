@@ -256,6 +256,14 @@ export function convertToBlockly(project: Sb3Project): BlocklyState | undefined 
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function addInput(block: BlocklyStateBlock, key: string, input: any[]) {
+        // Keep an obscured shadow: removing a reporter in Build must restore its fallback.
+        if (input[0] === 3 && input[2] != null) {
+            addInput(block, key, [1, input[2]]);
+            const fallback = block.inputs[key]?.shadow;
+            addInput(block, key, [2, input[1]]);
+            if (fallback && block.inputs[key]) block.inputs[key].shadow = fallback;
+            return;
+        }
         const value = input[0];
         const id = input[1];
         if (id === 'undefined') {
@@ -356,6 +364,12 @@ export function convertToBlockly(project: Sb3Project): BlocklyState | undefined 
         }
         if (scratchBlock.inputs) {
             for (const key of Object.keys(scratchBlock.inputs)) {
+                // SPIKE can leave stale sockets behind after a My Block input is removed.
+                if (
+                    ['procedures_prototype', 'procedures_call'].includes(scratchBlock.opcode) &&
+                    !JSON.parse(scratchBlock.mutation?.argumentids || '[]').includes(key)
+                )
+                    continue;
                 const input = scratchBlock.inputs[key];
                 if (definition) {
                     if (definition.inputs.indexOf(key) < 0) {
@@ -365,10 +379,10 @@ export function convertToBlockly(project: Sb3Project): BlocklyState | undefined 
                 addInput(block, key, input);
             }
         }
-        if (scratchBlock.x) {
+        if (scratchBlock.x !== undefined) {
             block.x = scratchBlock.x;
         }
-        if (scratchBlock.y) {
+        if (scratchBlock.y !== undefined) {
             block.y = scratchBlock.y;
         }
         if (scratchBlock.mutation) {
@@ -579,11 +593,7 @@ export function convertToScratch(state: BlocklyState): Sb3Project {
         if (block.fields) {
             for (const key of Object.keys(block.fields)) {
                 const value = block.fields[key];
-                if (block.type == 'data_variable') {
-                    sb3Block.fields[key] = encodeConst(value, state.variables ?? [], true);
-                } else {
-                    sb3Block.fields[key] = encodeConst(value, state.variables ?? [], false);
-                }
+                sb3Block.fields[key] = encodeConst(value, state.variables ?? [], false);
             }
         }
         if (block.inputs) {
@@ -594,12 +604,7 @@ export function convertToScratch(state: BlocklyState): Sb3Project {
                 if (value.shadow) {
                     shadowId = value.shadow.id!;
                     shadowBlock = recurseBlock(
-                        {
-                            id: shadowId,
-                            type: value.shadow.type,
-                            fields: value.shadow.fields,
-                            inputs: {}
-                        },
+                        { inputs: {}, ...value.shadow, id: shadowId },
                         false,
                         block,
                         true
@@ -609,7 +614,8 @@ export function convertToScratch(state: BlocklyState): Sb3Project {
                     const inputBlock = recurseBlock(value.block, false, block, false);
                     if (inputBlock.opcode == 'data_variable') {
                         // Remove, spike doesn't use this
-                        const variableValue = inputBlock.fields.VARIABLE[1];
+                        const variableValue = [12, ...inputBlock.fields.VARIABLE];
+                        delete linearBlocks[value.block.id!];
                         if (value.shadow) {
                             sb3Block.inputs[key] = [
                                 3,
@@ -690,9 +696,7 @@ export function convertToScratch(state: BlocklyState): Sb3Project {
                 warp: 'false'
             };
         }
-        if (block.type != 'data_variable') {
-            linearBlocks[block.id!] = sb3Block;
-        }
+        linearBlocks[block.id!] = sb3Block;
         return sb3Block;
     }
 

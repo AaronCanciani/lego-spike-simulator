@@ -1,6 +1,6 @@
 # SPIKE Lab — working preview
 
-This branch adds a student-facing, read-only program runner and 3D field to Alexandre Hardy's simulator. It is an early compatibility and teaching prototype, not a calibrated digital twin or complete LEGO runtime.
+This branch adds a student-facing block editor, program runner and 3D field to Alexandre Hardy's simulator. It is an early compatibility and teaching prototype, not a calibrated digital twin or complete LEGO runtime.
 
 ## Try it
 
@@ -12,18 +12,20 @@ The default is now an animated ADB-style approximation that needs no model downl
 
 Load a LEGO Word Blocks `.llsp3` file. Programs are unpacked in the browser; Python projects are rejected. Run, pause, reset, playback speed, 5 ms single-tick stepping, execution highlighting, custom-block arguments and a resizable split view are available. Uploaded programs are not sent to a server. The bundled sample is the user's exploratory My Blocks project, not a successful navigation benchmark.
 
+**Build** now gives the editor the full workspace, with a supported-block palette, variables and My Blocks creation. **Run** hides the palette and restores the read-only program/3D robot split. Switching to Build pauses an active run; testing edits starts a fresh simulation. Undo survives tab switches. Programs autosave locally and can be downloaded/reopened as `.spikelab` files (not LEGO-compatible exports). See [BUILD_MODE.md](BUILD_MODE.md) for persistence, coverage and limitations.
+
 The **Experiments** menu loads two purpose-built Scratch graphs: an open-loop two-second drive and a two-second proportional gyro controller (`steering = 3 × (0 − sensed yaw)`). Both use the regular interpreter, physical model and block viewer. Try identical settings, then raise effective wheel mismatch. Automated tests compare drift across four seeds and verify that feedback fails to correct drift when the sensed yaw is stuck at zero. This demonstrates the model's internal control-loop behavior, not hardware fidelity.
 
 ## What is implemented
 
 New color/line experiments and their positive/negative coverage are described in [SENSOR_TESTS.md](SENSOR_TESTS.md). Red and blue marker stops now exercise the real pixel classifier; a continuous reflected-light controller follows a curved training line to a red finish. These use ordinary Scratch blocks and distinguish detected targets from timeouts.
 
-- Reuses upstream Scratch-to-Blockly conversion, block definitions and renderer. New bounded generator interpreter in `src/lab/engine.ts`; unsupported reachable blocks fail explicitly.
-- Fixed 5 ms simulation time, seeded experiments, separate encoder/true-pose/sensed-yaw values, motor response and residual gain mismatch, effective wheel mismatch, illustrative surface slip, gyro drift/noise/quantization/delay.
-- Three.js ADB-style approximation, imported LDraw reference or cylinder; motor-animated wheels and demonstration C/D tools; orbit/overhead/robot/follow cameras, trail, sensor bodies and markers, clickable placement, telemetry and editable robot profile.
-- Two archived field images and a generated practice field; only boundary walls affect motion.
-- The supplied 202-block file executes its reachable custom procedures. Distance reporters are now supported; calling its unused distance routine requires replacing the requested port's color sensor in settings.
-- Color/reflection, ultrasonic distance, force/touch and motor encoders sample at 100 Hz. Per-sensor seeded errors, finite color footprint, stock ADB low-height black-classification stress, distance range/echo limits, and a spring-probe contact approximation are implemented. A live overlay shows readings, search cones and probes. Three native Scratch sensor-stop experiments exercise them end to end.
+-   Reuses upstream Scratch-to-Blockly conversion, block definitions and renderer. New bounded generator interpreter in `src/lab/engine.ts`; unsupported reachable blocks fail explicitly.
+-   Fixed 5 ms simulation time, seeded experiments, separate encoder/true-pose/sensed-yaw values, motor response and residual gain mismatch, effective wheel mismatch, illustrative surface slip, gyro drift/noise/quantization/delay.
+-   Three.js ADB-style approximation, imported LDraw reference or cylinder; motor-animated wheels and demonstration C/D tools; orbit/overhead/robot/follow cameras, trail, sensor bodies and markers, clickable placement, telemetry and editable robot profile.
+-   Two archived field images and a generated practice field; only boundary walls affect motion.
+-   The supplied 202-block file executes its reachable custom procedures. Distance reporters are now supported; calling its unused distance routine requires replacing the requested port's color sensor in settings.
+-   Color/reflection, ultrasonic distance, force/touch and motor encoders sample at 100 Hz. Per-sensor seeded errors, finite color footprint, stock ADB low-height black-classification stress, distance range/echo limits, and a spring-probe contact approximation are implemented. A live overlay shows readings, search cones and probes. Three native Scratch sensor-stop experiments exercise them end to end.
 
 ## Important limitations
 

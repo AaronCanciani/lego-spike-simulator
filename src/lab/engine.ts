@@ -71,7 +71,7 @@ type Thread = {
     args: Record<string, any>;
     done: boolean;
 };
-const statementOps = new Set([
+export const statementOps = new Set([
     'flipperevents_whenProgramStarts',
     'procedures_definition',
     'procedures_prototype',
@@ -100,7 +100,7 @@ const statementOps = new Set([
     'flippersensors_resetYaw',
     'flippersensors_resetTimer'
 ]);
-const expressionOps = new Set([
+export const expressionOps = new Set([
     'argument_reporter_string_number',
     'argument_reporter_boolean',
     'operator_add',

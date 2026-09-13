@@ -287,6 +287,117 @@ select {
     display: grid;
     grid-template-columns: calc(var(--split) - 4px) 8px calc(100% - var(--split) - 4px);
 }
+.workspace.build-mode {
+    grid-template-columns: minmax(0, 1fr);
+}
+.mode-hidden {
+    display: none !important;
+}
+.mode-tabs {
+    display: flex;
+    padding: 4px;
+    background: #e8edf3;
+    border-radius: 10px;
+    gap: 3px;
+}
+.mode-tabs button {
+    padding: 9px 17px;
+    border-radius: 7px;
+    background: transparent;
+    color: #64758a;
+    font-weight: 700;
+}
+.mode-tabs button[aria-selected='true'] {
+    background: #fff;
+    color: #192e46;
+    box-shadow: 0 2px 7px #182c4319;
+}
+.editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    font-size: 12px;
+    color: #64758a;
+}
+.builder-dialog {
+    border: 0;
+    border-radius: 18px;
+    padding: 28px;
+    max-width: 480px;
+    width: calc(100% - 40px);
+    color: #213044;
+    box-shadow: 0 25px 100px #07142144;
+}
+.builder-dialog::backdrop {
+    background: #10213888;
+    backdrop-filter: blur(3px);
+}
+.builder-dialog label {
+    display: grid;
+    gap: 6px;
+    margin: 14px 0;
+}
+.builder-dialog input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #c5d2df;
+    border-radius: 6px;
+}
+.builder-dialog p {
+    font-size: 13px;
+    line-height: 1.6;
+}
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+.dialog-actions button {
+    padding: 10px 14px;
+    border-radius: 8px;
+}
+.blocklyToolboxDiv {
+    padding-top: 12px;
+    background: #f4f6fa !important;
+    border-right: 1px solid #dee5ee;
+}
+.blocklyTreeRow {
+    height: 34px !important;
+    padding: 6px 12px !important;
+    margin-bottom: 4px !important;
+    border-radius: 0 7px 7px 0;
+}
+.blocklyTreeLabel {
+    font:
+        600 13px 'DM Sans',
+        sans-serif !important;
+}
+@media (max-width: 1250px) {
+    .topbar {
+        gap: 12px;
+        padding: 0 16px;
+    }
+    .top-actions {
+        gap: 3px;
+    }
+    .project-title {
+        max-width: 170px;
+        padding-left: 14px;
+    }
+    .project-title strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .transport {
+        gap: 12px;
+    }
+    .editor-actions span {
+        display: none;
+    }
+}
 .code-panel {
     background: #fff;
     min-width: 0;

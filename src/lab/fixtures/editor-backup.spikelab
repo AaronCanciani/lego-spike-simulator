@@ -1,0 +1,16 @@
+{
+  "format": "spike-lab",
+  "version": 1,
+  "name": "Editor backup test",
+  "project": {
+    "labEditorLayout": true,
+    "targets": [{
+      "isStage": false,
+      "variables": {"target": ["target heading", 17]},
+      "blocks": {
+        "start": {"opcode": "flipperevents_whenProgramStarts", "inputs": {}, "fields": {}, "topLevel": true, "next": "wait", "x": 60, "y": 40},
+        "wait": {"opcode": "control_wait", "inputs": {"DURATION": [1, [4, "0.1"]]}, "fields": {}, "parent": "start"}
+      }
+    }]
+  }
+}

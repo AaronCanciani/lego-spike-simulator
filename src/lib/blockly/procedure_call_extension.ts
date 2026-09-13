@@ -1,5 +1,5 @@
 import * as Blockly from 'blockly/core';
-import { getProcedureById, setupProtototypeBlock } from '$lib/blockly/procedure_flyout';
+import { setupProtototypeBlock } from '$lib/blockly/procedure_flyout';
 
 export function registerProcedureCallExtension(blockly: typeof Blockly) {
     if (blockly.Extensions.isRegistered('procedures_call_mutator')) {
@@ -57,15 +57,7 @@ export function registerProcedureCallExtension(blockly: typeof Blockly) {
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unused-vars
             saveExtraState: function (this: Blockly.Block, doFullSerialization: boolean): any {
-                const procedureId = this.data;
-                if (!procedureId) {
-                    return null;
-                }
-                const proc = getProcedureById(procedureId);
-                if (proc) {
-                    return proc.definition;
-                }
-                return null;
+                return (this as any).procedureDefinition ?? null;
             }
         });
     });

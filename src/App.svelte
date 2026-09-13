@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import JSZip from 'jszip';
     import ProgramView from './lab/ProgramView.svelte';
+    import { blankProject, inspectForEditor } from './lab/editorProject';
     import WorldView from './lab/WorldView.svelte';
     import { drivingExample } from './lab/examples';
     import { sensorExample } from './lab/sensorExamples';
@@ -65,6 +66,101 @@
     let appearance = 'advanced',
         modelStatus = 'Optional imported reference has not been loaded';
     let followRobot = false;
+    let mode: 'build' | 'run' = 'run',
+        dirty = false,
+        unsaved = false;
+    let draftStatus = '',
+        draftTimer: ReturnType<typeof setTimeout>;
+    const draftKey = 'spike-lab-program-draft-v1';
+    function saveDraft() {
+        try {
+            const p = dirty ? program.capture() : project;
+            localStorage.setItem(
+                draftKey,
+                JSON.stringify({ format: 'spike-lab', version: 1, name, project: p })
+            );
+            draftStatus = 'Draft saved in this browser';
+        } catch (e) {
+            draftStatus = 'Draft not saved — use Save program';
+        }
+    }
+    function edited() {
+        dirty = true;
+        unsaved = true;
+        draftStatus = 'Saving draft…';
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(saveDraft, 500);
+    }
+    function replaceAllowed() {
+        return (
+            !unsaved ||
+            window.confirm(
+                'Replace your edited program and its local draft? Make sure you have saved a copy if you want to keep it.'
+            )
+        );
+    }
+    function commitEdits() {
+        if (!dirty) return true;
+        try {
+            const p = program.capture();
+            inspect(p); // Validate before replacing the last runnable program.
+            program.acknowledge(p);
+            accept(p, name, true);
+            saveDraft();
+            return true;
+        } catch (e) {
+            error = `Check your blocks: ${e instanceof Error ? e.message : String(e)}`;
+            return false;
+        }
+    }
+    function switchMode(next: 'build' | 'run') {
+        if (next === 'run' && !commitEdits()) return false;
+        if (next === 'build' && engine?.state === 'running') {
+            engine.state = 'paused';
+            update();
+        }
+        placing = false;
+        mode = next;
+        return true;
+    }
+    function newProgram() {
+        if (!replaceAllowed()) return;
+        accept(blankProject(), 'My robot program');
+        lastFile = null;
+        mission = false;
+        switchMode('build');
+        saveDraft();
+    }
+    function downloadProgram() {
+        try {
+            const p = dirty ? program.capture() : project;
+            const url = URL.createObjectURL(
+                new Blob(
+                    [
+                        JSON.stringify(
+                            { format: 'spike-lab', version: 1, name, project: p },
+                            null,
+                            2
+                        )
+                    ],
+                    { type: 'application/json' }
+                )
+            );
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${name.replace(/[^a-z0-9 _-]/gi, '').trim() || 'My program'}.spikelab`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            saveDraft();
+            announce(
+                'Program download requested. If no file appears, open SPIKE Lab in a standard browser. Your local draft is kept.'
+            );
+        } catch (e) {
+            error = String(e);
+        }
+    }
     let notice = '',
         noticeTimer: ReturnType<typeof setTimeout>;
     const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
@@ -118,13 +214,19 @@
         clearTimeout(noticeTimer);
         noticeTimer = setTimeout(() => (notice = ''), 4500);
     }
-    function accept(p: Project, title: string) {
+    function accept(p: Project, title: string, fromEditor = false) {
         if (!Array.isArray(p.targets) || !p.targets.length)
             throw new Error('This file does not contain a Scratch block program.');
-        const report = inspect(p);
+        const report = inspectForEditor(p);
         if (report.total > 12000)
             throw new Error('This project exceeds the preview’s 12,000-block limit.');
         project = p;
+        clearTimeout(draftTimer);
+        dirty = false;
+        if (!fromEditor) {
+            unsaved = false;
+            draftStatus = '';
+        }
         info = report;
         name = title;
         roots = Object.entries(report.blocks)
@@ -139,7 +241,7 @@
                 label:
                     b.opcode === 'flipperevents_whenProgramStarts'
                         ? 'When program starts'
-                        : report.blocks[b.inputs.custom_block[1]]?.mutation?.proccode
+                        : report.blocks[b.inputs.custom_block?.[1]]?.mutation?.proccode
                               .replace(/%[sb]/g, '')
                               .replace(/\s+/g, ' ')
                               .trim() || 'Custom block'
@@ -151,8 +253,10 @@
         error = '';
         reset();
         loading = false;
+        if (!fromEditor) saveDraft();
     }
     async function loadSample() {
+        if (!replaceAllowed()) return;
         loading = true;
         try {
             const response = await fetch('/samples/new-code-blocks.json');
@@ -164,10 +268,20 @@
         }
     }
     async function loadFile(file: File) {
+        if (!replaceAllowed()) return;
         loading = true;
         try {
             if (file.size > 15 * 1024 * 1024)
                 throw new Error('Choose a project smaller than 15 MB.');
+            if (file.name.toLowerCase().endsWith('.spikelab')) {
+                const saved = JSON.parse(await file.text());
+                if (saved.format !== 'spike-lab' || saved.version !== 1)
+                    throw new Error('This is not a supported SPIKE Lab program.');
+                accept(saved.project, String(saved.name || 'My robot program'));
+                lastFile = file;
+                saveDraft();
+                return;
+            }
             const outer = await JSZip.loadAsync(file);
             const nested = outer.file('scratch.sb3');
             if (!nested)
@@ -189,6 +303,10 @@
     }
     function loadExample() {
         if (!example) return;
+        if (!replaceAllowed()) {
+            example = '';
+            return;
+        }
         mission = example.startsWith('coral');
         if (example === 'joints') {
             start = { x: 0, y: -100, heading: 0 };
@@ -291,7 +409,9 @@
         example = '';
     }
     function toggle() {
+        if (mode === 'build' && !switchMode('run')) return;
         if (!engine || !mapReady) return;
+        if (info?.unsupported.length) return;
         placing = false;
         if (snapshot.state === 'running') engine.state = 'paused';
         else {
@@ -368,6 +488,7 @@
             split = Math.max(30, Math.min(70, (event.clientX / window.innerWidth) * 100));
     }
     function onKey(event: KeyboardEvent) {
+        if (mode === 'build') return;
         if (
             event.code === 'Space' &&
             !['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(
@@ -379,13 +500,26 @@
         }
     }
     onMount(() => {
-        loadSample();
+        let restored = false;
+        try {
+            const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+            if (draft?.format === 'spike-lab' && draft.version === 1) {
+                accept(draft.project, String(draft.name || 'My robot program'));
+                mode = 'build';
+                draftStatus = 'Restored your local draft';
+                restored = true;
+            }
+        } catch {
+            /* A corrupt or unavailable local draft must not block opening the app. */
+        }
+        if (!restored) loadSample();
         last = performance.now();
         frame = requestAnimationFrame(tick);
     });
     onDestroy(() => {
         cancelAnimationFrame(frame);
         clearTimeout(noticeTimer);
+        clearTimeout(draftTimer);
     });
     $: busy = snapshot.state === 'running';
     $: status =
@@ -410,6 +544,13 @@
     on:pointermove={resize}
     on:pointerup={() => (resizeStart = false)}
     on:keydown={onKey}
+    on:beforeunload={(event) => {
+        if (unsaved) {
+            saveDraft();
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    }}
 />
 
 <div class="lab-shell">
@@ -422,8 +563,11 @@
         <div class="project-title">
             <span class="eyebrow">WORKSPACE</span><strong>{name}</strong>
         </div>
-        <span class="preview-badge">EARLY PREVIEW</span>
         <div class="top-actions">
+            <button class="quiet" disabled={busy || loading} on:click={newProgram}>New</button>
+            <button class="quiet" disabled={loading || !project} on:click={downloadProgram}
+                >Save program</button
+            >
             <select
                 aria-label="Load a driving experiment"
                 bind:value={example}
@@ -453,7 +597,7 @@
         <input
             hidden
             type="file"
-            accept=".llsp3"
+            accept=".llsp3,.spikelab"
             bind:this={fileInput}
             on:change={() => {
                 if (fileInput.files?.[0]) loadFile(fileInput.files[0]);
@@ -462,17 +606,29 @@
         />
     </header>
     <div class="transport">
+        <div class="mode-tabs" role="tablist" aria-label="Workspace mode">
+            <button role="tab" aria-selected={mode === 'build'} on:click={() => switchMode('build')}
+                >Build</button
+            >
+            <button role="tab" aria-selected={mode === 'run'} on:click={() => switchMode('run')}
+                >Run</button
+            >
+        </div>
         <div class="run-controls">
             <button
                 class="run-button"
                 on:click={toggle}
-                disabled={loading || !mapReady || !!info?.unsupported.length}
+                disabled={loading || !mapReady || (mode === 'run' && !!info?.unsupported.length)}
                 >{busy ? 'Ⅱ Pause' : '▶ Run'}</button
             ><button
                 class="icon-button"
                 aria-label="Step one simulation tick"
                 title="Step one 5 ms simulation tick"
-                disabled={busy || loading || !mapReady}
+                disabled={mode === 'build' ||
+                    busy ||
+                    loading ||
+                    !mapReady ||
+                    !!info?.unsupported.length}
                 on:click={step}>▸│</button
             ><button
                 class="icon-button"
@@ -493,7 +649,9 @@
         <div class="run-status" aria-live="polite">
             <span class:running={busy} class="status-dot"></span>{loading
                 ? 'Loading program…'
-                : status}<span class="clock">{fmt(snapshot.time, 2)} s</span>
+                : mode === 'build' && dirty
+                  ? 'Edits ready to test'
+                  : status}<span class="clock">{fmt(snapshot.time, 2)} s</span>
         </div>
         <button
             class="profile-button"
@@ -513,7 +671,7 @@
     {#if info?.unsupported.length}<div class="error-banner" role="alert">
             This program uses blocks not supported yet: {info.unsupported.join(', ')}
         </div>{/if}
-    {#if mission}
+    {#if mission && mode === 'run'}
         <section class="mission-brief" aria-label="Coral Nursery training mission">
             <div>
                 <strong>M01 · Coral Nursery</strong><small
@@ -535,14 +693,19 @@
             >
         </section>
     {/if}
-    <main class="workspace" style={`--split:${split}%`}>
-        <section class="code-panel" aria-label="Read-only program">
+    <main class="workspace" class:build-mode={mode === 'build'} style={`--split:${split}%`}>
+        <section
+            class="code-panel"
+            aria-label={mode === 'build' ? 'Block program editor' : 'Read-only program'}
+        >
             <div class="panel-heading">
                 <div>
                     <span class="panel-index">01</span>
-                    <h1>Program flow</h1>
+                    <h1>{mode === 'build' ? 'Build your program' : 'Program flow'}</h1>
                 </div>
-                <span class="subtle-tag">READ ONLY</span>
+                <span class="subtle-tag"
+                    >{mode === 'build' ? 'DRAG · CONNECT · EXPERIMENT' : 'READ ONLY'}</span
+                >
             </div>
             <div class="code-tools">
                 <select
@@ -554,12 +717,29 @@
                     }}
                     >{#each roots as root}<option value={root.id}>{root.label}</option
                         >{/each}</select
-                ><label class="check-label"
-                    ><input type="checkbox" bind:checked={follow} /> Follow</label
-                >
+                >{#if mode === 'build'}
+                    <div class="editor-actions">
+                        <button class="quiet" on:click={() => program.undo()}>Undo</button><button
+                            class="quiet"
+                            on:click={() => program.undo(true)}>Redo</button
+                        ><span
+                            >{draftStatus ||
+                                'Pick a category, then drag a block into your program'}</span
+                        >
+                    </div>
+                {:else}<label class="check-label"
+                        ><input type="checkbox" bind:checked={follow} /> Follow</label
+                    >{/if}
             </div>
             <div class="block-surface">
-                <ProgramView bind:this={program} {project} active={snapshot.active} {follow} />
+                <ProgramView
+                    bind:this={program}
+                    {project}
+                    building={mode === 'build'}
+                    active={mode === 'run' ? snapshot.active : []}
+                    {follow}
+                    on:edit={edited}
+                />
                 <div class="zoom-tools">
                     <button aria-label="Zoom blocks out" on:click={() => program.zoom(-1)}>−</button
                     ><button on:click={() => program.fit()}>Fit</button><button
@@ -569,7 +749,7 @@
                 </div>
                 {#if loading}<div class="loading-cover">Opening your program…</div>{/if}
             </div>
-            <div class="execution-inspector">
+            <div class="execution-inspector" class:mode-hidden={mode === 'build'}>
                 <span class="eyebrow"
                     >{snapshot.calls.length ? 'INSIDE CUSTOM BLOCK' : 'EXECUTION'}</span
                 ><strong
@@ -588,13 +768,19 @@
             </div>
             <div class="code-footer">
                 <span
-                    >{info?.total || 0} blocks <span class="tiny-divider">/</span>
-                    {info?.procedures.size || 0} custom blocks</span
-                ><span>{steps} execution events</span>
+                    >{#if mode === 'build' && draftStatus}{draftStatus}{:else}{info?.total || 0} blocks
+                        <span class="tiny-divider">/</span>
+                        {info?.procedures.size || 0} custom blocks{/if}</span
+                ><span
+                    >{mode === 'build'
+                        ? 'Run → watch your robot • Save program → keep a copy'
+                        : `${steps} execution events`}</span
+                >
             </div>
         </section>
         <button
             class="splitter"
+            class:mode-hidden={mode === 'build'}
             aria-label="Resize program and simulator panels"
             on:pointerdown={() => (resizeStart = true)}
             on:keydown={(e) => {
@@ -602,7 +788,11 @@
                 if (e.key === 'ArrowRight') split = Math.min(70, split + 5);
             }}><span></span></button
         >
-        <section class="simulation-panel" aria-label="3D robot simulation">
+        <section
+            class="simulation-panel"
+            class:mode-hidden={mode === 'build'}
+            aria-label="3D robot simulation"
+        >
             <div class="panel-heading dark">
                 <div>
                     <span class="panel-index">02</span>

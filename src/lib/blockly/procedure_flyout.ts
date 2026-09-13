@@ -150,12 +150,17 @@ function proceduresFlyoutCallback(workspace: Blockly.Workspace) {
         callbackkey: 'CREATE_SPIKE_BLOCK'
     });
 
-    for (const value of Object.values(procedureMap)) {
+    for (const block of workspace
+        .getAllBlocks(false)
+        .filter((b) => b.type === 'procedures_prototype')) {
+        const definition = (block as Blockly.Block & { procedureDefinition?: ProcedureDefinition })
+            .procedureDefinition;
+        if (!definition) continue;
         blockList.push({
             kind: 'block',
             type: 'procedures_call',
             fields: {},
-            extraState: value.definition
+            extraState: definition
         });
     }
 
