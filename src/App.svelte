@@ -1,11 +1,14 @@
 <script lang="ts">
     import { onMount, onDestroy, tick as flushUI } from 'svelte';
-    import JSZip from 'jszip';
+    import { importLego, exportLego } from './lab/legoTransfer';
     import ProgramView from './lab/ProgramView.svelte';
     import { publicRelease, assetUrl } from './lab/deployment';
     import { blankProject, inspectForEditor } from './lab/editorProject';
     import WorldView from './lab/WorldView.svelte';
     import StudentRobotSetup from './lab/StudentRobotSetup.svelte';
+    import AttachmentSettings from './lab/AttachmentSettings.svelte';
+    import { adbAttachments, legacyAttachments, type Attachments } from './lab/attachments';
+    let attachments: Attachments = structuredClone(adbAttachments);
     import MissionPanel from './lab/MissionPanel.svelte';
     import { archivedMaps, findMission } from './lab/missionCatalog';
     import { missionProgram, type MissionStarter } from './lab/missionPrograms';
@@ -24,7 +27,16 @@
         if (clear) trialResults = [];
     }
     function setupSave() {
-        return { map, start, profile, realism, selectedMission, practiceApproach, missionFriction };
+        return {
+            map,
+            start,
+            profile,
+            realism,
+            selectedMission,
+            practiceApproach,
+            missionFriction,
+            attachments
+        };
     }
     function chooseMission() {
         const m = findMission(selectedMission);
@@ -119,6 +131,7 @@
                 profile: activeProfile(),
                 start,
                 mission: m,
+                attachments,
                 count: trialCount,
                 pixels: { width: mapPixels.width, height: mapPixels.height, data: mapPixels.data }
             });
@@ -133,6 +146,7 @@
         realism = 'illustrative';
         start = { ...result.start };
         missionFriction = result.friction;
+        attachments = structuredClone(result.attachments ?? legacyAttachments);
         reset();
         trialResults = keptResults;
         mode = 'run';
@@ -254,7 +268,8 @@
                 s.start,
                 lift,
                 findMission(s.selectedMission),
-                s.missionFriction
+                s.missionFriction,
+                s.attachments ?? adbAttachments
             );
             map = s.map;
             profile = structuredClone(s.profile);
@@ -263,6 +278,7 @@
             selectedMission = s.selectedMission || '';
             practiceApproach = !!s.practiceApproach;
             missionFriction = s.missionFriction;
+            attachments = structuredClone(s.attachments ?? adbAttachments);
             liftEnabled = !!lift;
             if (lift) liftConfig = { ...lift };
             mapReady = map === readyMap;
@@ -400,6 +416,28 @@
             error = String(e);
         }
     }
+    async function downloadLego() {
+        if (!commitEdits()) return;
+        if (!project) return;
+        try {
+            const data = await exportLego(project, name);
+            const url = URL.createObjectURL(
+                new Blob([data as BlobPart], { type: 'application/zip' })
+            );
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${name.replace(/[^a-z0-9 _-]/gi, '').trim() || 'My program'}.llsp3`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            announce(
+                'Experimental LEGO export requested. Verify the .llsp3 in the SPIKE app before using a hub. Robot and field settings stay in the simulator backup.'
+            );
+        } catch (e) {
+            error = e instanceof Error ? e.message : String(e);
+        }
+    }
     let notice = '',
         noticeTimer: ReturnType<typeof setTimeout>;
     const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
@@ -438,7 +476,8 @@
                 start,
                 selectedMission ? null : liftEnabled ? liftConfig : null,
                 findMission(selectedMission),
-                missionFriction
+                missionFriction,
+                attachments
             );
             monitor = mission ? new MissionMonitor(start) : null;
             missionState = new MissionMonitor(start).snapshot();
@@ -535,18 +574,8 @@
                 saveDraft();
                 return;
             }
-            const outer = await JSZip.loadAsync(file);
-            const nested = outer.file('scratch.sb3');
-            if (!nested)
-                throw new Error(
-                    'Choose a LEGO Word Blocks .llsp3 file. Python projects are not supported.'
-                );
-            const inner = await JSZip.loadAsync(await nested.async('arraybuffer'));
-            const entry = inner.file('project.json');
-            if (!entry) throw new Error('The project is missing its block data.');
-            const text = await entry.async('text');
-            if (text.length > 5000000) throw new Error('The project block data is too large.');
-            accept(JSON.parse(text), file.name.replace(/\.llsp3$/i, ''));
+            const imported = await importLego(file);
+            accept(imported.project, imported.name);
             lastFile = file;
             announce('Program loaded. Your field and robot settings are kept.');
         } catch (e) {
@@ -856,6 +885,12 @@
             <button class="quiet" disabled={busy || loading} on:click={newProgram}>New</button>
             <button class="quiet" disabled={loading || !project} on:click={downloadProgram}
                 >Save program</button
+            >
+            <button
+                class="quiet"
+                title="Experimental .llsp3 export — LEGO app and hub validation still required"
+                disabled={busy || loading || !project}
+                on:click={downloadLego}>Export to LEGO</button
             >
             <select
                 aria-label="Load a driving experiment"
@@ -1344,18 +1379,17 @@
         </div>
         {#if settingsTab === 'student'}
             <div id="student-settings-panel" role="tabpanel" aria-labelledby="student-settings-tab">
-                {#if selectedMission}
-                    <p class="student-intro">
-                        Mission tool: port C lifts the yellow paddle. Choosing the cargo lift below
-                        leaves this mission. D is a demonstration tool only.
-                    </p>
-                {/if}
                 <StudentRobotSetup
                     bind:profile
+                    bind:attachments
                     bind:liftEnabled
                     {busy}
                     on:sensorchange={(e) => changeSensor(e.detail)}
                     on:change={setProfile}
+                    on:toolchange={() => {
+                        liftEnabled = false;
+                        reset();
+                    }}
                     on:attachmentchange={() => {
                         if (liftEnabled) selectedMission = '';
                         if (liftEnabled) appearance = 'advanced';
@@ -1374,6 +1408,7 @@
                     robot's equipment. Defaults are illustrative and have not been calibrated to
                     hardware.
                 </p>
+                <AttachmentSettings bind:attachments {busy} on:change={reset} />
                 <p class="profile-note">
                     Two large drive motors, two attachment motors and two color sensors. Geometry
                     and error settings are editable starting assumptions.

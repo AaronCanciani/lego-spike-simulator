@@ -3,6 +3,7 @@
 import { SensorBank, defaultSensors, type SensorConfig } from './sensors.ts';
 import { ManipulationWorld, type LiftConfig } from './manipulation.ts';
 import { CompetitionWorld } from './competitionWorld.ts';
+import { validateAttachments, type Attachments } from './attachments.ts';
 import type { MissionDefinition } from './missionCatalog.ts';
 export type Block = {
     opcode: string;
@@ -248,10 +249,12 @@ export class Engine {
         start = { x: -950, y: -330, heading: 180 },
         lift: LiftConfig | null = null,
         mission: MissionDefinition | null = null,
-        missionFriction = 0.45
+        missionFriction = 0.45,
+        attachments?: Attachments
     ) {
         if (!Number.isFinite(missionFriction) || missionFriction < 0 || missionFriction > 1.5)
             throw new Error('Mission contact friction must be between 0 and 1.5.');
+        if (attachments) validateAttachments(attachments);
         for (const key of [
             'wheel',
             'track',
@@ -295,8 +298,31 @@ export class Engine {
         this.path = [[this.x, this.y]];
         if (lift && mission)
             throw new Error('Choose either a mission arm or the Cargo Harbor lift.');
-        if (mission) this.competition = new CompetitionWorld(mission, start, missionFriction);
+        if (mission)
+            this.competition = new CompetitionWorld(mission, start, missionFriction, attachments, {
+                season: !!attachments
+            });
         else if (lift) this.manipulation = new ManipulationWorld(start, lift);
+        else if (attachments)
+            this.competition = new CompetitionWorld(
+                {
+                    id: 'free-field',
+                    map: '',
+                    number: '',
+                    name: 'Free run',
+                    kind: 'wall',
+                    goal: '',
+                    skills: '',
+                    route: '',
+                    source: '',
+                    target: { x: 0, y: 0 },
+                    start,
+                    approach: start
+                },
+                start,
+                missionFriction,
+                attachments
+            );
     }
     sampleSensors() {
         this.sensorBank.sample(
@@ -680,7 +706,14 @@ export class Engine {
     }
     physics() {
         for (const [port, m] of Object.entries(this.motors)) {
-            if ((this.manipulation || this.competition) && port === 'C') continue;
+            if (
+                (this.manipulation && port === 'C') ||
+                (this.competition &&
+                    (this.competition.attachments
+                        ? this.competition.attachments.has(port)
+                        : port === 'C'))
+            )
+                continue;
             const side = port === this.profile.left ? 1 : port === this.profile.right ? -1 : 0;
             const gain = 1 + (side * this.profile.motorMismatch) / 200;
             const tau =
@@ -720,7 +753,14 @@ export class Engine {
             ny = clamp(this.y + dy, -HEIGHT / 2 + 100, HEIGHT / 2 - 100);
         this.collision = Math.abs(nx - this.x - dx) > 0.01 || Math.abs(ny - this.y - dy) > 0.01;
         if (this.competition) {
-            const next = this.competition.step(DT, dx / DT, dy / DT, angular, this.motors.C);
+            const next = this.competition.step(
+                DT,
+                dx / DT,
+                dy / DT,
+                angular,
+                this.motors.C,
+                this.motors.D
+            );
             nx = next.x;
             ny = next.y;
             this.heading = next.heading;

@@ -11,8 +11,10 @@ import {
     World
 } from 'cannon-es';
 import { CargoSolver } from './manipulation.ts';
-import type { MissionDefinition } from './missionCatalog.ts';
+import { missionCatalog, type MissionDefinition } from './missionCatalog.ts';
 import type { Pose } from './sensors.ts';
+import { AttachmentPhysics } from './attachmentPhysics.ts';
+import type { Attachments } from './attachments.ts';
 
 type Motor = { position: number; velocity: number; command: number; target: number | null };
 export type Part = {
@@ -47,6 +49,7 @@ export class CompetitionWorld {
     chassis: Body;
     arm: Body;
     hinge: HingeConstraint;
+    attachments: AttachmentPhysics | null = null;
     items = new Map<string, Item>();
     sliders: Slider[] = [];
     mission: MissionDefinition;
@@ -64,9 +67,29 @@ export class CompetitionWorld {
     private wallSquared = false;
     private wallX = 0;
     private payloadOrigins = new Map<string, Vec3>();
-    constructor(mission: MissionDefinition, start: Pose, friction = 0.45) {
+    companions: CompetitionWorld[] = [];
+    constructor(
+        mission: MissionDefinition,
+        start: Pose,
+        friction = 0.45,
+        tools?: Attachments,
+        options: { season?: boolean; host?: CompetitionWorld } = {}
+    ) {
         this.mission = structuredClone(mission);
+        if (mission.id === 'free-field') this.message = 'Free run';
         this.heading = start.heading;
+        if (options.host) {
+            const host = options.host;
+            this.world = host.world;
+            this.material = host.material;
+            this.chassis = host.chassis;
+            this.arm = host.arm;
+            this.hinge = host.hinge;
+            this.attachments = host.attachments;
+            this.items.set('floor', host.items.get('floor')!);
+            this.build();
+            return;
+        }
         this.world.solver = new CargoSolver(friction);
         this.world.addContactMaterial(
             new ContactMaterial(this.material, this.material, {
@@ -96,29 +119,56 @@ export class CompetitionWorld {
         });
         this.chassis.quaternion.setFromAxisAngle(new Vec3(0, 1, 0), -start.heading * rad);
         this.world.addBody(this.chassis);
-        // One finite-torque C lift paddle. Hinge constraints transfer loads to the chassis.
-        const armPos = this.chassis.pointToWorldFrame(new Vec3(0, -0.035, -0.15));
-        this.arm = this.solid(
-            'arm-C',
-            [80, 8, 120],
-            armPos.scale(1000).toArray(),
-            '#ffc84a',
-            0.12,
-            8
-        ).body;
-        this.arm.collisionFilterMask = 3;
-        this.arm.quaternion.copy(this.chassis.quaternion);
-        this.hinge = new HingeConstraint(this.chassis, this.arm, {
-            pivotA: new Vec3(0, -0.035, -0.09),
-            pivotB: new Vec3(0, 0, 0.06),
-            axisA: new Vec3(1, 0, 0),
-            axisB: new Vec3(1, 0, 0),
-            collideConnected: false
-        });
-        this.hinge.enableMotor();
-        this.hinge.setMotorMaxForce(0.35);
-        this.world.addConstraint(this.hinge);
+        if (tools) {
+            this.attachments = new AttachmentPhysics(
+                this.world,
+                this.chassis,
+                this.material,
+                tools
+            );
+            // Legacy fields are only used by the original paddle test fixture.
+            this.arm = this.chassis;
+            this.hinge = null!;
+        } else {
+            // Legacy paddle retained for old saved setups and regression fixtures.
+            const armPos = this.chassis.pointToWorldFrame(new Vec3(0, -0.035, -0.15));
+            this.arm = this.solid(
+                'arm-C',
+                [80, 8, 120],
+                armPos.scale(1000).toArray(),
+                '#ffc84a',
+                0.12,
+                8
+            ).body;
+            this.arm.collisionFilterMask = 3;
+            this.arm.quaternion.copy(this.chassis.quaternion);
+            this.hinge = new HingeConstraint(this.chassis, this.arm, {
+                pivotA: new Vec3(0, -0.035, -0.09),
+                pivotB: new Vec3(0, 0, 0.06),
+                axisA: new Vec3(1, 0, 0),
+                axisB: new Vec3(1, 0, 0),
+                collideConnected: false
+            });
+            this.hinge.enableMotor();
+            this.hinge.setMotorMaxForce(0.35);
+            this.world.addConstraint(this.hinge);
+        }
         this.build();
+        if (options.season)
+            for (const other of missionCatalog.filter(
+                (m) => m.map === mission.map && m.id !== mission.id
+            ))
+                this.companions.push(
+                    new CompetitionWorld(other, start, friction, tools, { host: this })
+                );
+    }
+    private robotTouching(body: Body) {
+        return (
+            this.touching(body, this.chassis) ||
+            (this.attachments
+                ? this.attachments.bodies().some((arm) => this.touching(body, arm))
+                : this.touching(body, this.arm))
+        );
     }
     private solid(
         id: string,
@@ -309,7 +359,7 @@ export class CompetitionWorld {
             this.items.get(`cube-${i}`)!.body.velocity.set(0, 0.8, -1.5);
         }
     }
-    step(dt: number, vx: number, vy: number, angular: number, motor: Motor) {
+    step(dt: number, vx: number, vy: number, angular: number, motor: Motor, motorD?: Motor) {
         this.elapsed += dt;
         const c = this.chassis;
         c.force.set(
@@ -318,45 +368,68 @@ export class CompetitionWorld {
             cap((-vy / 1000 - c.velocity.z) * 30, 8)
         );
         c.torque.y = cap((-angular - c.angularVelocity.y) * 0.08, 0.12);
-        const requested =
-            motor.target !== null
-                ? cap((motor.target - this.armAngle) * 8, Math.abs(motor.command))
-                : motor.command || cap((this.armHold - this.armAngle) * 8, 180);
-        if (motor.command) this.armHold = this.armAngle;
-        this.hinge.setMotorSpeed(-requested * rad);
-        for (const s of this.sliders) {
-            const d = s.item.body.position.vsub(s.origin).dot(s.axis);
-            s.item.body.force.vadd(s.axis.scale(-Math.max(0, d) * s.spring), s.item.body.force);
+        const motors = {
+            C: motor,
+            D: motorD ?? { position: 0, velocity: 0, command: 0, target: null }
+        };
+        if (this.attachments) this.attachments.before(motors, dt);
+        else {
+            const requested =
+                motor.target !== null
+                    ? cap((motor.target - this.armAngle) * 8, Math.abs(motor.command))
+                    : motor.command || cap((this.armHold - this.armAngle) * 8, 180);
+            if (motor.command) this.armHold = this.armAngle;
+            this.hinge.setMotorSpeed(-requested * rad);
         }
+        this.applySprings();
+        for (const companion of this.companions) companion.applySprings();
         this.world.step(dt);
-        const relative = c.quaternion.inverse().mult(this.arm.quaternion);
-        const rawAngle = (2 * Math.atan2(relative.x, relative.w)) / rad;
-        const change = wrap(rawAngle - this.armAngle);
-        this.armAngle += change;
-        motor.position = this.armAngle;
-        motor.velocity = change / dt;
-        if (
-            motor.target !== null &&
-            Math.abs(motor.target - motor.position) < 1 &&
-            Math.abs(motor.velocity) < 10
-        ) {
-            motor.command = 0;
-            motor.target = null;
-            this.armHold = this.armAngle;
+        if (this.attachments) this.attachments.after(dt, motors);
+        else {
+            const relative = c.quaternion.inverse().mult(this.arm.quaternion);
+            const rawAngle = (2 * Math.atan2(relative.x, relative.w)) / rad;
+            const change = wrap(rawAngle - this.armAngle);
+            this.armAngle += change;
+            motor.position = this.armAngle;
+            motor.velocity = change / dt;
+            if (
+                motor.target !== null &&
+                Math.abs(motor.target - motor.position) < 1 &&
+                Math.abs(motor.velocity) < 10
+            ) {
+                motor.command = 0;
+                motor.target = null;
+                this.armHold = this.armAngle;
+            }
         }
         const q = c.quaternion;
         const rawHeading =
             -Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z)) / rad;
         this.heading += wrap(rawHeading - this.heading);
         this.contact = this.world.contacts.some(
-            (e) => (e.bi === c || e.bj === c) && e.bi !== this.arm && e.bj !== this.arm
+            (e) =>
+                (e.bi === c || e.bj === c) &&
+                (this.attachments || (e.bi !== this.arm && e.bj !== this.arm))
         );
+        this.updateMechanisms(dt);
+        for (const companion of this.companions) {
+            companion.elapsed = this.elapsed;
+            companion.updateMechanisms(dt);
+        }
+        return { x: c.position.x * 1000, y: -c.position.z * 1000, heading: this.heading };
+    }
+    private applySprings() {
+        for (const s of this.sliders) {
+            const d = s.item.body.position.vsub(s.origin).dot(s.axis);
+            s.item.body.force.vadd(s.axis.scale(-Math.max(0, d) * s.spring), s.item.body.force);
+        }
+    }
+    private updateMechanisms(dt: number) {
         for (const s of this.sliders) {
             const b = s.item.body;
             let d = b.position.vsub(s.origin).dot(s.axis);
             const touching =
-                this.touching(b, c) ||
-                this.touching(b, this.arm) ||
+                this.robotTouching(b) ||
                 (this.mission.kind === 'dock' && this.touching(b, this.items.get('vessel')!.body));
             if (touching) s.touched = true;
             if (d < 0 || d > s.travel) {
@@ -379,14 +452,12 @@ export class CompetitionWorld {
             }
         }
         this.assess(dt);
-        return { x: c.position.x * 1000, y: -c.position.z * 1000, heading: this.heading };
     }
     private resting(id: string) {
         const b = this.items.get(id)!.body;
         return (
             this.touching(b, this.items.get('floor')!.body) &&
-            !this.touching(b, this.chassis) &&
-            !this.touching(b, this.arm) &&
+            !this.robotTouching(b) &&
             b.velocity.length() < 0.02 &&
             b.angularVelocity.length() < 0.15
         );
@@ -413,6 +484,10 @@ export class CompetitionWorld {
         );
     }
     private assess(dt: number) {
+        if (this.mission.id === 'free-field') {
+            this.message = 'Free run';
+            return;
+        }
         const {
             kind,
             target: { x, y }
@@ -447,10 +522,7 @@ export class CompetitionWorld {
         } else if (kind === 'screens') {
             const touching = [...this.items.entries()]
                 .filter(([id]) => id === 'activator' || id.startsWith('screen'))
-                .some(
-                    ([, item]) =>
-                        this.touching(item.body, this.chassis) || this.touching(item.body, this.arm)
-                );
+                .some(([, item]) => this.robotTouching(item.body));
             this.progress = this.released.has('activator') ? 0.8 : 0;
             success = this.released.has('activator') && !touching;
         } else if (kind === 'solar') {
@@ -503,7 +575,7 @@ export class CompetitionWorld {
         this.message =
             this.failed ||
             (this.complete
-                ? 'Teaching objective complete'
+                ? 'Mission objective complete'
                 : this.progress > 0
                   ? 'Making progress — finish the objective'
                   : this.elapsed > 0
@@ -530,6 +602,18 @@ export class CompetitionWorld {
               }
             : { distance: Infinity, incidence: 0 };
     }
+    private modelParts(): Part[] {
+        return [...this.items]
+            .filter(([id]) => !['floor', 'north', 'south', 'west', 'east'].includes(id))
+            .map(([id, item]) => ({
+                id,
+                size: item.size,
+                color: item.color,
+                shape: item.shape,
+                position: item.body.position.toArray().map((n) => n * 1000),
+                quaternion: item.body.quaternion.toArray()
+            }));
+    }
     snapshot() {
         return {
             id: this.mission.id,
@@ -537,18 +621,21 @@ export class CompetitionWorld {
             failed: this.failed,
             progress: this.progress,
             message: this.message,
-            parts: [...this.items]
-                .filter(([id]) => !['floor', 'north', 'south', 'west', 'east'].includes(id))
-                .map(
-                    ([id, item]): Part => ({
-                        id,
-                        size: item.size,
-                        color: item.color,
-                        shape: item.shape,
-                        position: item.body.position.toArray().map((n) => n * 1000),
-                        quaternion: item.body.quaternion.toArray()
-                    })
+            missions: [this, ...this.companions]
+                .filter((w) => w.mission.id !== 'free-field')
+                .map((w) => ({
+                    id: w.mission.id,
+                    name: w.mission.name,
+                    complete: w.complete,
+                    progress: w.progress,
+                    failed: w.failed
+                })),
+            parts: this.modelParts().concat(
+                this.attachments?.snapshot() ?? [],
+                this.companions.flatMap((w) =>
+                    w.modelParts().map((p) => ({ ...p, id: `${w.mission.id}/${p.id}` }))
                 )
+            )
         };
     }
 }

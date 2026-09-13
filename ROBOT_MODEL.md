@@ -1,5 +1,7 @@
 # Animated robot models
 
+**Current attachment update:** normal runs now use physical rear C dozer/front D lift geometry, configurable through My Robot. See [attachment mechanics and limits](ATTACHMENTS.md). The earlier display-only tools described below remain legacy renderer fixtures, not the normal app's attachments. Normal runs now use the rectangular physical chassis; the planar-only engine remains for regression fixtures.
+
 The default view is now an original, code-generated **Advanced Driving Base-style approximation**, inspired by the user's build reference. It is not an exact LEGO assembly, scanned model, building instruction or verified CAD reconstruction.
 
 ## What students can see

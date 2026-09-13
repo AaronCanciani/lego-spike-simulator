@@ -13,9 +13,9 @@ The palette contains implemented driving, motor, sensor, control, operator and v
 ## Persistence
 
 -   A single current program draft is saved in this browser's local storage after edits. Reload restores it in Build mode, including unfinished functions that need fixing before they can run.
--   **Save program** downloads a `.spikelab` JSON backup; **Load program** reopens it. This is a simulator format, **not a verified LEGO `.llsp3` export**. Original downloaded LEGO files are never modified.
+-   **Save program** downloads a `.spikelab` JSON backup; **Load program** reopens it. **Export to LEGO** now downloads an experimental `.llsp3`; see [transfer verification and outstanding checks](PROGRAM_TRANSFER.md). Original downloaded LEGO files are never modified.
 -   Loading a different program replaces the local draft. After edits, the app asks before replacing it and warns before closing the page; save separate copies for multiple programs.
--   Drafts/backups retain program data and positions, not field selection, calibration settings, live motor state or execution history. Undo history is session-only.
+-   Drafts/backups retain program data, block positions, field selection, robot/attachment configuration and calibration settings. They do not retain live motor state or execution history. Undo history is session-only.
 -   Local storage can be unavailable or full; the footer reports this and advises saving a file. Backups are advisable before clearing browser data.
 
 ## Implementation and verification

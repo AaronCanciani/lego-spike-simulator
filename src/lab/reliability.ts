@@ -1,6 +1,7 @@
 import { Engine, type Profile, type Project } from './engine.ts';
 import type { MissionDefinition } from './missionCatalog.ts';
 import type { Pose, Surface } from './sensors.ts';
+import type { Attachments } from './attachments.ts';
 
 export type TrialInput = {
     project: Project;
@@ -8,6 +9,7 @@ export type TrialInput = {
     start: Pose;
     mission: MissionDefinition;
     count: number;
+    attachments?: Attachments;
 };
 export type TrialResult = {
     index: number;
@@ -19,6 +21,7 @@ export type TrialResult = {
     profile: Profile;
     start: Pose;
     friction: number;
+    attachments?: Attachments;
 };
 export function trialConditions(input: TrialInput, index: number) {
     const profile = structuredClone(input.profile);
@@ -46,7 +49,15 @@ export function runTrial(
     colorAt: (x: number, y: number) => Surface
 ): TrialResult {
     const c = trialConditions(input, index);
-    const engine = new Engine(input.project, c.profile, c.start, null, input.mission, c.friction);
+    const engine = new Engine(
+        input.project,
+        c.profile,
+        c.start,
+        null,
+        input.mission,
+        c.friction,
+        input.attachments
+    );
     engine.colorAt = colorAt;
     engine.start();
     while (engine.state === 'running') engine.step();
@@ -54,6 +65,7 @@ export function runTrial(
     return {
         index: index + 1,
         ...c,
+        attachments: input.attachments ? structuredClone(input.attachments) : undefined,
         success: engine.state === 'finished' && result.complete,
         reason:
             engine.error ||

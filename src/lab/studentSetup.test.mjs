@@ -11,7 +11,10 @@ const processed = await preprocess(source, {
 });
 const compiled = compile(processed.code, { generate: 'ssr' });
 const bundled = await build({
-    stdin: { contents: compiled.js.code, resolveDir: process.cwd() },
+    stdin: {
+        contents: compiled.js.code,
+        resolveDir: new URL('.', import.meta.url).pathname.replace(/^\/(\w:)/, '$1')
+    },
     bundle: true,
     write: false,
     platform: 'node',

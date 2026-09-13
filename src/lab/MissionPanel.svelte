@@ -47,7 +47,10 @@
         </div>
         <p class="mission-objective">{mission.goal}</p>
         <small
-            >Solid walls + this mission’s 3D parts. Other pictured objects are flat artwork.</small
+            >Solid walls + {state?.missions.length ?? 1} modeled mission{(state?.missions.length ??
+                1) === 1
+                ? ''
+                : 's'} from this season. Unmodeled objects in the photo remain flat.</small
         >
         <details bind:open={toolsOpen} class="mission-tools">
             <summary
@@ -55,15 +58,23 @@
                     · {successes}/{results.length} passed{/if}</summary
             >
             <details>
-                <summary>Route, skills & model limits</summary>
-                <p><strong>{mission.skills}</strong></p>
-                <p>{mission.route}</p>
+                <summary>Board models & limits</summary>
+                {#if state?.missions.length}
+                    <ul>
+                        {#each state.missions as model}<li>
+                                {model.name}{model.complete
+                                    ? ' · complete'
+                                    : model.failed
+                                      ? ' · failed'
+                                      : ''}
+                            </li>{/each}
+                    </ul>
+                {/if}
                 <p>
                     Archived field photos; original simplified physical models. Locations are
                     approximate. This tests the objective above, not every official scoring option.
                     Pictured models baked into the photo are NOT extra obstacles; the color sensor
-                    reads the photo itself. C drives a finite-torque lift paddle; D remains a visual
-                    demonstration tool.
+                    reads the photo itself. Configure physical tools on C and D in My Robot.
                 </p>
                 <p>
                     Cyan ring = suggested launch. Gold ring = short practice approach. Outlined
@@ -101,7 +112,7 @@
                 <p>
                     Test this program from the current start. Each seeded trial varies placement ±10
                     mm / ±3°, wheel mismatch ±1.5 percentage points, motor mismatch ±0.8, slip ±0.5
-                    and contact friction ±20%. These are teaching ranges, not measured hardware
+                    and contact friction ±20%. These are illustrative ranges, not measured hardware
                     statistics.
                 </p>
                 <div class="mission-actions">

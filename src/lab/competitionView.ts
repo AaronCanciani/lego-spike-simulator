@@ -7,6 +7,7 @@ export function createCompetitionView() {
     const group = new THREE.Group();
     const meshes = new Map<string, THREE.Mesh>();
     let id = '';
+    let geometryKey = '';
     const clear = () => {
         group.traverse((obj) => {
             const mesh = obj as THREE.Mesh;
@@ -36,33 +37,37 @@ export function createCompetitionView() {
             }
             return;
         }
-        if (id !== state.id) {
+        const nextKey = JSON.stringify(state.parts.map((p) => [p.id, p.size, p.color, p.shape]));
+        if (id !== state.id || geometryKey !== nextKey) {
             clear();
             id = state.id;
-            const m = findMission(id)!;
-            ring(m.start.x, m.start.y, 105, '#3ac5d8');
-            ring(m.approach.x, m.approach.y, 105, '#ffd558');
-            if (m.kind === 'build') ring(m.target.x, m.target.y, 70, '#ec3f56');
-            if (m.kind === 'space') {
-                const finish = new THREE.Mesh(
-                    new THREE.BoxGeometry(4, 2, 110),
-                    new THREE.MeshBasicMaterial({ color: '#36ddbb' })
-                );
-                finish.position.set(m.target.x + 280, 1, -m.target.y - 110);
-                group.add(finish);
+            geometryKey = nextKey;
+            const m = findMission(id);
+            if (m) {
+                ring(m.start.x, m.start.y, 105, '#3ac5d8');
+                ring(m.approach.x, m.approach.y, 105, '#ffd558');
+                if (m.kind === 'build') ring(m.target.x, m.target.y, 70, '#ec3f56');
+                if (m.kind === 'space') {
+                    const finish = new THREE.Mesh(
+                        new THREE.BoxGeometry(4, 2, 110),
+                        new THREE.MeshBasicMaterial({ color: '#36ddbb' })
+                    );
+                    finish.position.set(m.target.x + 280, 1, -m.target.y - 110);
+                    group.add(finish);
+                }
+                if (m.kind === 'tire') {
+                    ring(m.target.x, m.target.y - 120, 90, '#36ddbb');
+                    const line = new THREE.Mesh(
+                        new THREE.BoxGeometry(4, 2, 1143),
+                        new THREE.MeshBasicMaterial({ color: '#ff426b' })
+                    );
+                    line.position.set(360, 1, 0);
+                    group.add(line);
+                }
+                if (m.kind === 'solar')
+                    for (let i = 0; i < 3; i++)
+                        ring(m.target.x + (i - 1) * 90, m.target.y, 33, '#ffcf48');
             }
-            if (m.kind === 'tire') {
-                ring(m.target.x, m.target.y - 120, 90, '#36ddbb');
-                const line = new THREE.Mesh(
-                    new THREE.BoxGeometry(4, 2, 1143),
-                    new THREE.MeshBasicMaterial({ color: '#ff426b' })
-                );
-                line.position.set(360, 1, 0);
-                group.add(line);
-            }
-            if (m.kind === 'solar')
-                for (let i = 0; i < 3; i++)
-                    ring(m.target.x + (i - 1) * 90, m.target.y, 33, '#ffcf48');
         }
         const current = new Set(state.parts.map((p) => p.id));
         for (const [key, mesh] of meshes)

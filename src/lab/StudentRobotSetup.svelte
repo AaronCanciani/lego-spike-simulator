@@ -1,11 +1,21 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
     import type { Profile } from './engine';
+    import { adbAttachments, toolPreset, type Attachments, type ToolKind } from './attachments';
+    export let attachments: Attachments = structuredClone(adbAttachments);
     export let profile: Profile;
     export let liftEnabled = false;
     export let busy = false;
     const dispatch = createEventDispatcher();
     const ports = ['B', 'F'] as const;
+    const toolPorts = ['C', 'D'] as const;
+    function toolChanged(port: 'C' | 'D', event: Event) {
+        attachments = {
+            ...attachments,
+            [port]: toolPreset((event.currentTarget as HTMLSelectElement).value as ToolKind)
+        };
+        dispatch('toolchange');
+    }
     const descriptions = {
         color: 'Looks down at colors and lines on the mat.',
         distance: 'Looks ahead to measure distance to walls and cargo.',
@@ -108,21 +118,61 @@
             Match the movement-motor pair in your program to your wiring. A and E are wheel motors;
             C and D are attachment motors.
         </p>
-        <label
-            >Attachment
-            <select
-                aria-label="Robot attachment"
-                bind:value={liftEnabled}
-                on:change={() => dispatch('attachmentchange')}
-            >
-                <option value={false}>No cargo lift</option>
-                <option value={true}>C = cargo lift (prototype)</option>
-            </select>
-        </label>
+        <h3>My attachments</h3>
+        <div class="sensor-cards">
+            {#each toolPorts as port}
+                <section class="sensor-card">
+                    <h3><span class="port-letter">{port}</span> Port {port}</h3>
+                    <label
+                        >Tool
+                        <select
+                            aria-label={`Port ${port} attachment`}
+                            value={attachments[port].kind}
+                            on:change={(event) => toolChanged(port, event)}
+                        >
+                            <option value="dozer">Rear dozer blade</option>
+                            <option value="lift">Front lift arm</option>
+                            <option value="paddle">Simple lift paddle</option>
+                            <option value="none">No attachment</option>
+                        </select>
+                    </label>
+                    <p>
+                        {attachments[port].kind === 'none'
+                            ? 'No tool on this motor.'
+                            : `Mounted on the ${attachments[port].facing}. Moves with motor ${port}.`}
+                    </p>
+                </section>
+            {/each}
+        </div>
         <p class="student-help">
-            The prototype lift also adds a cargo cube and delivery zone. It is not an exact model of
-            your own attachment.
+            Advanced Driving Base: dozer at the back, lift at the front. Choose the port that
+            matches your wiring.
         </p>
+        <button
+            type="button"
+            on:click={() => {
+                attachments = structuredClone(adbAttachments);
+                dispatch('toolchange');
+            }}>Use Advanced Driving Base attachments</button
+        >
+        <details class="mounting-details">
+            <summary>Separate cargo-lift prototype</summary>
+            <label
+                >Attachment
+                <select
+                    aria-label="Robot attachment"
+                    bind:value={liftEnabled}
+                    on:change={() => dispatch('attachmentchange')}
+                >
+                    <option value={false}>No cargo lift</option>
+                    <option value={true}>C = cargo lift (prototype)</option>
+                </select>
+            </label>
+            <p class="student-help">
+                The prototype lift also adds a cargo cube and delivery zone. It is not an exact
+                model of your own attachment.
+            </p>
+        </details>
     </fieldset>
     <div class="student-tip">
         Your blocks are kept; changing equipment resets the run. Open <strong>Sensors</strong> in the
