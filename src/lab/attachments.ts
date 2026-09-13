@@ -48,7 +48,7 @@ export function toolPreset(kind: ToolKind): ToolConfig {
             ...common,
             facing: 'rear',
             forward: -75,
-            length: 170,
+            length: 119,
             width: 120,
             drop: 75,
             height: 105,
@@ -75,18 +75,21 @@ export function toolPreset(kind: ToolKind): ToolConfig {
 }
 export const adbAttachments: Attachments = { C: toolPreset('dozer'), D: toolPreset('lift') };
 export const legacyAttachments: Attachments = { C: toolPreset('paddle'), D: toolPreset('none') };
-// Upgrade only untouched front-lift presets in browser drafts. Explicitly imported
+// Upgrade only untouched old attachment presets in browser drafts. Explicitly imported
 // backups/replays and any user-calibrated attachment configurations stay unchanged.
-export function updateDraftLiftSize(tools: Attachments): Attachments {
+export function updateDraftAttachmentSizes(tools: Attachments): Attachments {
     const updated = structuredClone(tools);
-    const previous = { ...toolPreset('lift'), length: 185, width: 24, drop: 96 };
+    const previous = [
+        { ...toolPreset('lift'), length: 185, width: 24, drop: 96 },
+        { ...toolPreset('dozer'), length: 170 }
+    ];
     for (const port of ['C', 'D'] as const) {
-        if (
-            Object.entries(previous).every(
+        const preset = previous.find((old) =>
+            Object.entries(old).every(
                 ([key, value]) => updated[port]?.[key as keyof ToolConfig] === value
             )
-        )
-            updated[port] = toolPreset('lift');
+        );
+        if (preset) updated[port] = toolPreset(preset.kind);
     }
     return updated;
 }

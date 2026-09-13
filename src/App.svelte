@@ -10,7 +10,7 @@
     import {
         adbAttachments,
         legacyAttachments,
-        updateDraftLiftSize,
+        updateDraftAttachmentSizes,
         type Attachments
     } from './lab/attachments';
     let attachments: Attachments = structuredClone(adbAttachments);
@@ -830,7 +830,7 @@
             const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
             if (draft?.format === 'spike-lab' && draft.version === 1) {
                 if (draft.setup?.attachments)
-                    draft.setup.attachments = updateDraftLiftSize(draft.setup.attachments);
+                    draft.setup.attachments = updateDraftAttachmentSizes(draft.setup.attachments);
                 restoreCargo(draft);
                 accept(draft.project, String(draft.name || 'My robot program'));
                 mode = 'build';

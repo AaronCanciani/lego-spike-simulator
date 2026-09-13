@@ -8,7 +8,9 @@ My Robot offers independent C/D choices: dozer, lift arm, simple paddle or no at
 
 The front attachment has two bent rails and a short lifting finger. The rear attachment has segmented curved supports, a wide blue blade and purple bottom edge. Rendering and collision use the **same part definitions**, including orientation. These are original simplified geometry, not imported LEGO CAD or an exact brick assembly.
 
-The front lift's default outline is 30% smaller following the student's visual feedback: length 129.5 mm, width 16.8 mm and drop 67.2 mm (previously 185 / 24 / 96). Beam thickness, chassis mounting pivot, gearing, travel limits, mass and torque are unchanged; this is an approximate outline correction, not a hardware calibration. The shorter finger has less reach and ground clearance changes accordingly. The rear dozer is unchanged. Untouched old front-lift presets in browser drafts update automatically; custom configurations, imported backups and recorded replays retain their explicit geometry.
+The front lift's default outline is 30% smaller following the student's visual feedback: length 129.5 mm, width 16.8 mm and drop 67.2 mm (previously 185 / 24 / 96). Beam thickness, chassis mounting pivot, gearing, travel limits, mass and torque are unchanged; this is an approximate outline correction, not a hardware calibration. The shorter finger has less reach and ground clearance changes accordingly.
+
+The rear dozer's default length is also shortened by 30%, from 170 to 119 mm. Only its rearward reach changes: the 120 mm-wide blade, 75 mm drop, mount and mechanical settings remain unchanged. Rendering and collision both use the shorter supports and closer blade. Untouched old lift/dozer presets in browser drafts update automatically; custom configurations, imported backups and recorded replays retain their explicit geometry.
 
 ## Mechanics and limits
 

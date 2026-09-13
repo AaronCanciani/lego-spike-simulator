@@ -6,7 +6,7 @@ import {
     toolPreset,
     toolParts,
     validateAttachments,
-    updateDraftLiftSize
+    updateDraftAttachmentSizes
 } from './attachments.ts';
 import { CompetitionWorld } from './competitionWorld.ts';
 import { wallMission, missionCatalog } from './missionCatalog.ts';
@@ -19,7 +19,7 @@ function step(w, seconds, C = motor(), D = motor(), vy = 0) {
     for (let i = 0; i < seconds / DT; i++) w.step(DT, 0, vy, 0, C, D);
 }
 
-test('front lift outline is 30% smaller while the rear dozer and mount stay unchanged', () => {
+test('front lift outline stays 30% smaller with its mount unchanged', () => {
     const lift = toolPreset('lift'),
         dozer = toolPreset('dozer');
     for (const [key, previous] of Object.entries({ length: 185, width: 24, drop: 96 }))
@@ -27,7 +27,7 @@ test('front lift outline is 30% smaller while the rear dozer and mount stay unch
     assert.equal(lift.forward, 75);
     assert.equal(lift.height, 105);
     assert.equal(lift.ratio, 3);
-    assert.equal(dozer.length, 170);
+    assert.equal(dozer.length, 119);
     assert.equal(dozer.width, 120);
     assert.equal(dozer.drop, 75);
     const tip = toolParts(lift).find((p) => p.id === 'tip');
@@ -40,16 +40,53 @@ test('draft upgrade resizes only untouched old front lifts, is idempotent and ne
     const old = { ...toolPreset('lift'), length: 185, width: 24, drop: 96 };
     const tools = { C: toolPreset('dozer'), D: old },
         original = structuredClone(tools);
-    const updated = updateDraftLiftSize(tools);
+    const updated = updateDraftAttachmentSizes(tools);
     assert.deepEqual(updated.D, toolPreset('lift'));
     assert.deepEqual(updated.C, tools.C);
     assert.deepEqual(tools, original);
-    assert.deepEqual(updateDraftLiftSize(updated), updated);
+    assert.deepEqual(updateDraftAttachmentSizes(updated), updated);
     for (const change of [{ length: 180 }, { facing: 'rear' }, { ratio: 4 }, { initial: 30 }]) {
         const custom = { C: toolPreset('dozer'), D: { ...old, ...change } };
-        assert.deepEqual(updateDraftLiftSize(custom), custom);
+        assert.deepEqual(updateDraftAttachmentSizes(custom), custom);
     }
-    assert.deepEqual(updateDraftLiftSize({ C: old, D: toolPreset('none') }).C, toolPreset('lift'));
+    assert.deepEqual(
+        updateDraftAttachmentSizes({ C: old, D: toolPreset('none') }).C,
+        toolPreset('lift')
+    );
+});
+
+test('rear dozer is 30% shorter with the same blade, drop, mounting and mechanics', () => {
+    const current = toolPreset('dozer'),
+        previous = { ...current, length: 170 };
+    assert.equal(current.length / previous.length, 0.7);
+    const oldParts = toolParts(previous),
+        parts = toolParts(current);
+    for (const id of ['blade', 'blade-edge']) {
+        const old = oldParts.find((p) => p.id === id),
+            part = parts.find((p) => p.id === id);
+        assert.deepEqual(part.size, old.size);
+        assert.deepEqual(part.position.slice(0, 2), old.position.slice(0, 2));
+        assert.equal(part.position[2] - old.position[2], 51);
+    }
+    assert.deepEqual(current, { ...previous, length: 119 });
+});
+
+test('draft upgrade shortens untouched rear dozers on either port without changing custom setups', () => {
+    const old = { ...toolPreset('dozer'), length: 170 };
+    const tools = { C: old, D: toolPreset('lift') },
+        original = structuredClone(tools);
+    const updated = updateDraftAttachmentSizes(tools);
+    assert.deepEqual(updated, adbAttachments);
+    assert.deepEqual(tools, original);
+    assert.deepEqual(updateDraftAttachmentSizes(updated), updated);
+    assert.deepEqual(
+        updateDraftAttachmentSizes({ C: toolPreset('none'), D: old }).D,
+        toolPreset('dozer')
+    );
+    for (const change of [{ length: 160 }, { width: 100 }, { facing: 'front' }, { ratio: 4 }]) {
+        const custom = { C: { ...old, ...change }, D: toolPreset('lift') };
+        assert.deepEqual(updateDraftAttachmentSizes(custom), custom);
+    }
 });
 
 test('stock pair places physical C dozer behind and D lift in front; every rendered part has a collider', () => {
@@ -138,16 +175,17 @@ function payload(w, position, size, mass = 0.08) {
     return b;
 }
 test('rear dozer pushes a cube through blade contact; raising the blade misses it', () => {
+    const cubeZ = (75 + toolPreset('dozer').length + 55) / 1000;
     const run = (initial) => {
         const tools = structuredClone(adbAttachments);
         tools.C.initial = initial;
         const w = rig(tools),
-            b = payload(w, [0, 0.03, 0.3], [0.06, 0.06, 0.06]);
+            b = payload(w, [0, 0.03, cubeZ], [0.06, 0.06, 0.06]);
         step(w, 1.2, motor(), motor(), -80);
         return b.position.z;
     };
-    assert.ok(run(0) > 0.33);
-    assert.ok(Math.abs(run(80) - 0.3) < 0.005);
+    assert.ok(run(0) > cubeZ + 0.03);
+    assert.ok(Math.abs(run(80) - cubeZ) < 0.005);
 });
 test('a longer custom front finger physically raises a supported plate; a missed plate stays down', () => {
     const run = (z) => {
