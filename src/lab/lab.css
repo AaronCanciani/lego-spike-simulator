@@ -830,7 +830,7 @@ select {
     right: 0;
     top: 0;
     bottom: 0;
-    width: 430px;
+    width: 540px;
     max-width: 95vw;
     background: #fff;
     box-shadow: -10px 0 50px #0a162929;
@@ -843,6 +843,126 @@ select {
     gap: 15px;
     align-items: center;
     justify-content: space-between;
+}
+.robot-settings-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    background: #edf2f7;
+    border-radius: 10px;
+    padding: 5px;
+    margin-top: 20px;
+}
+.robot-settings-tabs button {
+    text-align: left;
+    border: 0;
+    border-radius: 7px;
+    padding: 11px 14px;
+    background: transparent;
+    color: #5a6b80;
+    font-weight: 650;
+}
+.robot-settings-tabs button[aria-selected='true'] {
+    background: white;
+    color: #22384e;
+    box-shadow: 0 2px 7px #1b36501a;
+}
+.robot-settings-tabs small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 400;
+}
+.student-intro {
+    font-size: 14px;
+    color: #556a80;
+    line-height: 1.5;
+    margin: 17px 0;
+}
+.sensor-cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+.sensor-card {
+    padding: 14px;
+    background: #f2f7fc;
+    border: 1px solid #dce6ef;
+    border-radius: 11px;
+}
+.settings-drawer .sensor-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 17px;
+    margin: 0 0 12px;
+    color: #233c56;
+}
+.port-letter {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: #d9b73e;
+    color: #21344b;
+}
+.sensor-card:nth-child(2) .port-letter {
+    background: #72c9db;
+}
+.sensor-card p,
+.student-help {
+    font-size: 12px;
+    color: #5f7287;
+    line-height: 1.5;
+}
+.sensor-card p {
+    min-height: 3em;
+    margin: 10px 0 0;
+}
+.mounting-details {
+    margin: 15px 0 20px;
+    border-bottom: 1px solid #e0e7ee;
+    padding-bottom: 14px;
+}
+.mounting-details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: #496682;
+}
+.mounting-details label {
+    margin: 12px 0;
+}
+.student-tip,
+.advanced-warning,
+.student-warning {
+    border-radius: 8px;
+    background: #fff5d8;
+    padding: 13px;
+    color: #6f5a23;
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 18px 0;
+}
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+@media (max-width: 400px) {
+    .settings-drawer {
+        padding: 18px;
+    }
+    .sensor-card {
+        padding: 10px;
+    }
+    .sensor-cards {
+        gap: 8px;
+    }
 }
 .drawer-title h2 {
     font:

@@ -5,6 +5,17 @@
     import { publicRelease, assetUrl } from './lab/deployment';
     import { blankProject, inspectForEditor } from './lab/editorProject';
     import WorldView from './lab/WorldView.svelte';
+    import StudentRobotSetup from './lab/StudentRobotSetup.svelte';
+    let settingsTab: 'student' | 'advanced' = 'student';
+    let settingsDrawer: HTMLElement;
+    function openRobotSettings() {
+        if (!settings) settingsTab = 'student';
+        settings = !settings;
+    }
+    function selectSettingsTab(value: 'student' | 'advanced') {
+        settingsTab = value;
+        settingsDrawer?.scrollTo({ top: 0 });
+    }
     import { drivingExample } from './lab/examples';
     import { sensorExample } from './lab/sensorExamples';
     import { colorExample, resultVariable, type ColorExperiment } from './lab/colorExamples';
@@ -554,7 +565,6 @@
         profile = { ...profile };
         reset();
     }
-    const sensorPorts = ['B', 'F'] as const;
     function changeSensor(port: 'B' | 'F') {
         const mount = profile.sensorConfig.ports[port];
         Object.assign(mount, {
@@ -743,8 +753,9 @@
         <button
             class="profile-button"
             class:selected={settings}
-            on:click={() => (settings = !settings)}
-            >⚙ <span>Advanced Driving Base</span><span class="chevron">⌄</span></button
+            aria-label="My Robot settings"
+            on:click={openRobotSettings}
+            >⚙ <span>My Robot</span><span class="chevron">⌄</span></button
         >
     </div>
     {#if error || snapshot.error}<div class="error-banner" role="alert">
@@ -1093,11 +1104,15 @@
 </div>
 {#if settings}
     <div class="drawer-backdrop" role="presentation" on:click={() => (settings = false)}></div>
-    <aside class="settings-drawer" aria-label="Robot and simulation settings">
+    <aside
+        class="settings-drawer"
+        aria-label="Robot and simulation settings"
+        bind:this={settingsDrawer}
+    >
         <div class="drawer-title">
             <div>
-                <span class="eyebrow">ROBOT PROFILE</span>
-                <h2>Advanced Driving Base</h2>
+                <span class="eyebrow">ADVANCED DRIVING BASE</span>
+                <h2>{settingsTab === 'student' ? 'My Robot' : 'Simulation tuning'}</h2>
             </div>
             <button
                 class="icon-button"
@@ -1105,335 +1120,348 @@
                 on:click={() => (settings = false)}>×</button
             >
         </div>
-        <p class="profile-note">
-            Two large drive motors, two attachment motors and two color sensors. Geometry and error
-            settings are editable starting assumptions.
-        </p>
-        <fieldset disabled={busy}>
-            <label class="field-label"
-                >Robot appearance<select bind:value={appearance} disabled={liftEnabled}
-                    ><option value="advanced">Advanced Driving Base · approximation</option
-                    >{#if !publicRelease}<option value="reference">Imported reference build</option
-                        >{/if}<option value="cylinder">Diagnostic cylinder</option></select
-                ></label
+        <div class="robot-settings-tabs" role="tablist" aria-label="Robot settings sections">
+            <button
+                id="student-settings-tab"
+                role="tab"
+                aria-selected={settingsTab === 'student'}
+                aria-controls="student-settings-panel"
+                on:click={() => selectSettingsTab('student')}
+                >My Robot <small>Student setup</small></button
             >
-            <p class="small-note">
-                ADB-style geometry follows the configured drive-wheel diameter, track and B/F sensor
-                mounts. It is not a brick-for-brick reconstruction; C/D tools are illustrative. The
-                optional imported build is a different assembly. Appearance never changes physics. {modelStatus}.
-            </p>
-            <label class="field-label"
-                >Simulation profile<select bind:value={realism} on:change={setProfile}
-                    ><option value="illustrative">Illustrative imperfections</option><option
-                        value="ideal">Ideal reference</option
-                    ></select
-                ></label
+            <button
+                id="advanced-settings-tab"
+                role="tab"
+                aria-selected={settingsTab === 'advanced'}
+                aria-controls="advanced-settings-panel"
+                on:click={() => selectSettingsTab('advanced')}
+                >Advanced <small>Teacher / developer</small></button
             >
-            <div class="settings-grid">
-                <label
-                    >Wheel diameter <span>mm</span><input
-                        type="number"
-                        min="20"
-                        max="150"
-                        bind:value={profile.wheel}
-                        on:change={setProfile}
-                    /></label
-                ><label
-                    >Axle track <span>mm · estimate</span><input
-                        type="number"
-                        min="50"
-                        max="400"
-                        bind:value={profile.track}
-                        on:change={setProfile}
-                    /></label
-                >
-            </div>
-            <h3>Cargo lab attachment</h3>
-            <label
-                ><input
-                    type="checkbox"
-                    bind:checked={liftEnabled}
-                    on:change={() => {
+        </div>
+        {#if settingsTab === 'student'}
+            <div id="student-settings-panel" role="tabpanel" aria-labelledby="student-settings-tab">
+                <StudentRobotSetup
+                    bind:profile
+                    bind:liftEnabled
+                    {busy}
+                    on:sensorchange={(e) => changeSensor(e.detail)}
+                    on:change={setProfile}
+                    on:attachmentchange={() => {
                         if (liftEnabled) appearance = 'advanced';
                         reset();
                     }}
-                /> Enable prototype lift & payload</label
-            >
-            {#if liftEnabled}
-                <p class="small-note">
-                    Port C drives a linear fork carriage (0–140 mm), not his actual attachment. Cube
-                    rests on two forks; no magnetic pickup. Vertical force is limited; lateral tool
-                    reactions and chassis tipping are not modeled yet. World freezes when the
-                    program ends: include a wait to let cargo settle.
-                </p>
-                <div class="settings-grid">
-                    <label
-                        >Fork length <span>mm</span><input
-                            type="number"
-                            min="40"
-                            max="180"
-                            step="5"
-                            bind:value={liftConfig.forkLength}
-                            on:change={reset}
-                        /></label
-                    >
-                    <label
-                        >Payload mass <span>kg</span><input
-                            type="number"
-                            min="0.01"
-                            max="2"
-                            step="0.01"
-                            bind:value={liftConfig.mass}
-                            on:change={reset}
-                        /></label
-                    >
-                    <label
-                        >Surface friction<input
-                            type="number"
-                            min="0"
-                            max="1.5"
-                            step="0.05"
-                            bind:value={liftConfig.friction}
-                            on:change={reset}
-                        /></label
-                    >
-                    <label
-                        >Lift force limit <span>N · illustrative</span><input
-                            type="number"
-                            min="0.2"
-                            max="20"
-                            step="0.2"
-                            bind:value={liftConfig.maxLiftForce}
-                            on:change={reset}
-                        /></label
-                    >
-                    <label
-                        >Lift gearing <span>mm / motor degree</span><input
-                            type="number"
-                            min="0.05"
-                            max="2"
-                            step="0.05"
-                            bind:value={liftConfig.mmPerDegree}
-                            on:change={reset}
-                        /></label
-                    >
-                </div>
-            {/if}
-            <h3>Drive connections</h3>
-            <div class="settings-grid">
-                <label
-                    >Left motor<select bind:value={profile.left} on:change={setProfile}
-                        ><option>A</option><option>E</option></select
-                    ></label
-                ><label
-                    >Right motor<select bind:value={profile.right} on:change={setProfile}
-                        ><option>E</option><option>A</option></select
-                    ></label
-                ><label
-                    >Left forward polarity<select
-                        bind:value={profile.leftSign}
-                        on:change={setProfile}
-                        ><option value={-1}>Counterclockwise</option><option value={1}
-                            >Clockwise</option
-                        ></select
-                    ></label
-                ><label
-                    >Right forward polarity<select
-                        bind:value={profile.rightSign}
-                        on:change={setProfile}
-                        ><option value={1}>Clockwise</option><option value={-1}
-                            >Counterclockwise</option
-                        ></select
-                    ></label
-                >
+                />
             </div>
-            <p class="small-note">
-                The sample selects E+A. Port order affects direction. Check orientation against his
-                physical build.
-            </p>
-            <h3>Sensors & mounting</h3>
-            <p class="small-note">
-                Stock B/F are downward color sensors at about 8 mm. Distance or force replaces a
-                color sensor; A/C/D/E remain motors. Optional mounts point forward and sense table
-                walls, plus the cargo payload when Cargo lab is enabled (at the sensor's height).
-            </p>
-            {#each sensorPorts as port}
-                <div class="settings-grid">
-                    <label
-                        >Port {port}<select
-                            bind:value={profile.sensorConfig.ports[port].kind}
-                            on:change={() => changeSensor(port)}
+        {:else}
+            <div
+                id="advanced-settings-panel"
+                role="tabpanel"
+                aria-labelledby="advanced-settings-tab"
+            >
+                <p class="advanced-warning">
+                    Teacher / developer controls. These change the simulation model, not just the
+                    robot's equipment. Defaults are illustrative and have not been calibrated to
+                    hardware.
+                </p>
+                <p class="profile-note">
+                    Two large drive motors, two attachment motors and two color sensors. Geometry
+                    and error settings are editable starting assumptions.
+                </p>
+                <fieldset disabled={busy}>
+                    <label class="field-label"
+                        >Robot appearance<select bind:value={appearance} disabled={liftEnabled}
+                            ><option value="advanced">Advanced Driving Base · approximation</option
+                            >{#if !publicRelease}<option value="reference"
+                                    >Imported reference build</option
+                                >{/if}<option value="cylinder">Diagnostic cylinder</option></select
+                        ></label
+                    >
+                    <p class="small-note">
+                        ADB-style geometry follows the configured drive-wheel diameter, track and
+                        B/F sensor mounts. It is not a brick-for-brick reconstruction; C/D tools are
+                        illustrative. The optional imported build is a different assembly.
+                        Appearance never changes physics. {modelStatus}.
+                    </p>
+                    <label class="field-label"
+                        >Simulation profile<select bind:value={realism} on:change={setProfile}
+                            ><option value="illustrative">Illustrative imperfections</option><option
+                                value="ideal">Ideal reference</option
+                            ></select
+                        ></label
+                    >
+                    <div class="settings-grid">
+                        <label
+                            >Wheel diameter <span>mm</span><input
+                                type="number"
+                                min="20"
+                                max="150"
+                                bind:value={profile.wheel}
+                                on:change={setProfile}
+                            /></label
+                        ><label
+                            >Axle track <span>mm · estimate</span><input
+                                type="number"
+                                min="50"
+                                max="400"
+                                bind:value={profile.track}
+                                on:change={setProfile}
+                            /></label
                         >
-                            <option value="color">Color / reflection</option><option
-                                value="distance">Ultrasonic distance</option
-                            ><option value="force">Force / touch probe</option><option value="none"
-                                >Disconnected</option
+                    </div>
+                    <h3>Cargo lab attachment</h3>
+                    <label
+                        ><input
+                            type="checkbox"
+                            bind:checked={liftEnabled}
+                            on:change={() => {
+                                if (liftEnabled) appearance = 'advanced';
+                                reset();
+                            }}
+                        /> Enable prototype lift & payload</label
+                    >
+                    {#if liftEnabled}
+                        <p class="small-note">
+                            Port C drives a linear fork carriage (0–140 mm), not his actual
+                            attachment. Cube rests on two forks; no magnetic pickup. Vertical force
+                            is limited; lateral tool reactions and chassis tipping are not modeled
+                            yet. World freezes when the program ends: include a wait to let cargo
+                            settle.
+                        </p>
+                        <div class="settings-grid">
+                            <label
+                                >Fork length <span>mm</span><input
+                                    type="number"
+                                    min="40"
+                                    max="180"
+                                    step="5"
+                                    bind:value={liftConfig.forkLength}
+                                    on:change={reset}
+                                /></label
                             >
-                        </select></label
-                    >
-                    <label
-                        >Height <span>mm</span><input
-                            type="number"
+                            <label
+                                >Payload mass <span>kg</span><input
+                                    type="number"
+                                    min="0.01"
+                                    max="2"
+                                    step="0.01"
+                                    bind:value={liftConfig.mass}
+                                    on:change={reset}
+                                /></label
+                            >
+                            <label
+                                >Surface friction<input
+                                    type="number"
+                                    min="0"
+                                    max="1.5"
+                                    step="0.05"
+                                    bind:value={liftConfig.friction}
+                                    on:change={reset}
+                                /></label
+                            >
+                            <label
+                                >Lift force limit <span>N · illustrative</span><input
+                                    type="number"
+                                    min="0.2"
+                                    max="20"
+                                    step="0.2"
+                                    bind:value={liftConfig.maxLiftForce}
+                                    on:change={reset}
+                                /></label
+                            >
+                            <label
+                                >Lift gearing <span>mm / motor degree</span><input
+                                    type="number"
+                                    min="0.05"
+                                    max="2"
+                                    step="0.05"
+                                    bind:value={liftConfig.mmPerDegree}
+                                    on:change={reset}
+                                /></label
+                            >
+                        </div>
+                    {/if}
+                    <h3>Drive connections</h3>
+                    <div class="settings-grid">
+                        <label
+                            >Left motor<select bind:value={profile.left} on:change={setProfile}
+                                ><option>A</option><option>E</option></select
+                            ></label
+                        ><label
+                            >Right motor<select bind:value={profile.right} on:change={setProfile}
+                                ><option>E</option><option>A</option></select
+                            ></label
+                        ><label
+                            >Left forward polarity<select
+                                bind:value={profile.leftSign}
+                                on:change={setProfile}
+                                ><option value={-1}>Counterclockwise</option><option value={1}
+                                    >Clockwise</option
+                                ></select
+                            ></label
+                        ><label
+                            >Right forward polarity<select
+                                bind:value={profile.rightSign}
+                                on:change={setProfile}
+                                ><option value={1}>Clockwise</option><option value={-1}
+                                    >Counterclockwise</option
+                                ></select
+                            ></label
+                        >
+                    </div>
+                    <p class="small-note">
+                        The sample selects E+A. Port order affects direction. Check orientation
+                        against his physical build.
+                    </p>
+                    <h3>Sensor calibration</h3>
+                    <p class="small-note">
+                        Stock B/F are downward color sensors at about 8 mm. Distance or force
+                        replaces a color sensor; A/C/D/E remain motors. Optional mounts point
+                        forward and sense table walls, plus the cargo payload when Cargo lab is
+                        enabled (at the sensor's height).
+                    </p>
+                    <p class="small-note">
+                        Choose sensors and their physical positions in My Robot. This tab controls
+                        sensor errors and simulation assumptions.
+                    </p>
+                    <p class="small-note">
+                        Raise color sensors to 16 mm to compare black detection. Heights affect
+                        color sensing; optional sensors use a flat, full-height wall model. The
+                        force offset is its backplate; its probe extends another 8 mm.
+                    </p>
+                    <label class="range-label"
+                        >Reflection noise <strong>±{profile.sensorConfig.reflectionNoise}%</strong
+                        ><input
+                            type="range"
                             min="0"
-                            max="150"
-                            bind:value={profile.sensorConfig.ports[port].height}
+                            max="10"
+                            step=".5"
+                            bind:value={profile.sensorConfig.reflectionNoise}
                             on:change={setProfile}
                         /></label
                     >
-                    <label
-                        >Forward offset <span>mm</span><input
+                    <label class="range-label"
+                        >Distance error envelope <strong
+                            >±{profile.sensorConfig.distanceError} mm</strong
+                        ><input
+                            type="range"
+                            min="0"
+                            max="50"
+                            step="1"
+                            bind:value={profile.sensorConfig.distanceError}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Missed echo assumption <strong
+                            >{Math.round(profile.sensorConfig.distanceDropout * 100)}%</strong
+                        ><input
+                            type="range"
+                            min="0"
+                            max=".25"
+                            step=".01"
+                            bind:value={profile.sensorConfig.distanceDropout}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <p class="small-note">
+                        No echo reports −1; distance predicates are false. This is a provisional
+                        simulator convention, pending a Word Blocks hardware test. Sensor
+                        event-start blocks and full 3D tilt/acceleration are not implemented.
+                    </p>
+                    <h3>Drive & gyro imperfections</h3>
+                    <label class="range-label"
+                        >Residual motor mismatch<strong>{profile.motorMismatch}%</strong><input
+                            type="range"
+                            min="0"
+                            max="8"
+                            step=".1"
+                            bind:value={profile.motorMismatch}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Effective wheel mismatch<strong>{profile.mismatch}%</strong><input
+                            type="range"
+                            min="0"
+                            max="8"
+                            step=".1"
+                            bind:value={profile.mismatch}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Surface slip<strong>{profile.slip}%</strong><input
+                            type="range"
+                            min="0"
+                            max="15"
+                            step=".5"
+                            bind:value={profile.slip}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Gyro drift<strong>{profile.gyroBias}°/s</strong><input
+                            type="range"
+                            min="-1"
+                            max="1"
+                            step=".01"
+                            bind:value={profile.gyroBias}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Gyro noise<strong>{profile.gyroNoise}°</strong><input
+                            type="range"
+                            min="0"
+                            max="3"
+                            step=".1"
+                            bind:value={profile.gyroNoise}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="range-label"
+                        >Motor response time<strong>{profile.response}s</strong><input
+                            type="range"
+                            min=".01"
+                            max=".3"
+                            step=".01"
+                            bind:value={profile.response}
+                            on:change={setProfile}
+                        /></label
+                    >
+                    <label class="field-label"
+                        >Repeatable random seed<input
                             type="number"
-                            min="-200"
-                            max="200"
-                            bind:value={profile.sensorConfig.ports[port].forward}
+                            min="1"
+                            max="2147483647"
+                            bind:value={profile.seed}
                             on:change={setProfile}
                         /></label
                     >
-                    <label
-                        >Right offset <span>mm</span><input
-                            type="number"
-                            min="-200"
-                            max="200"
-                            bind:value={profile.sensorConfig.ports[port].side}
-                            on:change={setProfile}
-                        /></label
-                    >
+                </fieldset>
+                <div class="scope-note">
+                    <strong>Preview boundaries</strong>
+                    <p>
+                        Real mat artwork with estimated registration. The Coral Nursery exercise
+                        uses a simplified tool-motion check, not contact physics or official
+                        scoring. C/D demo tools follow physical motor angles. Color/reflection,
+                        distance, force/touch, yaw and motor-angle readings have sampled models. Mat
+                        brightness is not measured reflectance; noise distributions and probe
+                        mechanics still need calibration. The hub uses an inertial gyro, not a
+                        compass.
+                    </p>
+                    {#if info?.unusedUnsupported.length}<p>
+                            Unused unsupported blocks: {info.unusedUnsupported.join(', ')}.
+                        </p>{/if}
                 </div>
-            {/each}
-            <p class="small-note">
-                Raise color sensors to 16 mm to compare black detection. Heights affect color
-                sensing; optional sensors use a flat, full-height wall model. The force offset is
-                its backplate; its probe extends another 8 mm.
-            </p>
-            <label class="range-label"
-                >Reflection noise <strong>±{profile.sensorConfig.reflectionNoise}%</strong><input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step=".5"
-                    bind:value={profile.sensorConfig.reflectionNoise}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Distance error envelope <strong>±{profile.sensorConfig.distanceError} mm</strong
-                ><input
-                    type="range"
-                    min="0"
-                    max="50"
-                    step="1"
-                    bind:value={profile.sensorConfig.distanceError}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Missed echo assumption <strong
-                    >{Math.round(profile.sensorConfig.distanceDropout * 100)}%</strong
-                ><input
-                    type="range"
-                    min="0"
-                    max=".25"
-                    step=".01"
-                    bind:value={profile.sensorConfig.distanceDropout}
-                    on:change={setProfile}
-                /></label
-            >
-            <p class="small-note">
-                No echo reports −1; distance predicates are false. This is a provisional simulator
-                convention, pending a Word Blocks hardware test. Sensor event-start blocks and full
-                3D tilt/acceleration are not implemented.
-            </p>
-            <h3>Drive & gyro imperfections</h3>
-            <label class="range-label"
-                >Residual motor mismatch<strong>{profile.motorMismatch}%</strong><input
-                    type="range"
-                    min="0"
-                    max="8"
-                    step=".1"
-                    bind:value={profile.motorMismatch}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Effective wheel mismatch<strong>{profile.mismatch}%</strong><input
-                    type="range"
-                    min="0"
-                    max="8"
-                    step=".1"
-                    bind:value={profile.mismatch}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Surface slip<strong>{profile.slip}%</strong><input
-                    type="range"
-                    min="0"
-                    max="15"
-                    step=".5"
-                    bind:value={profile.slip}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Gyro drift<strong>{profile.gyroBias}°/s</strong><input
-                    type="range"
-                    min="-1"
-                    max="1"
-                    step=".01"
-                    bind:value={profile.gyroBias}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Gyro noise<strong>{profile.gyroNoise}°</strong><input
-                    type="range"
-                    min="0"
-                    max="3"
-                    step=".1"
-                    bind:value={profile.gyroNoise}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="range-label"
-                >Motor response time<strong>{profile.response}s</strong><input
-                    type="range"
-                    min=".01"
-                    max=".3"
-                    step=".01"
-                    bind:value={profile.response}
-                    on:change={setProfile}
-                /></label
-            >
-            <label class="field-label"
-                >Repeatable random seed<input
-                    type="number"
-                    min="1"
-                    max="2147483647"
-                    bind:value={profile.seed}
-                    on:change={setProfile}
-                /></label
-            >
-        </fieldset>
-        <div class="scope-note">
-            <strong>Preview boundaries</strong>
-            <p>
-                Real mat artwork with estimated registration. The Coral Nursery exercise uses a
-                simplified tool-motion check, not contact physics or official scoring. C/D demo
-                tools follow physical motor angles. Color/reflection, distance, force/touch, yaw and
-                motor-angle readings have sampled models. Mat brightness is not measured
-                reflectance; noise distributions and probe mechanics still need calibration. The hub
-                uses an inertial gyro, not a compass.
-            </p>
-            {#if info?.unusedUnsupported.length}<p>
-                    Unused unsupported blocks: {info.unusedUnsupported.join(', ')}.
-                </p>{/if}
-        </div>
-        <div class="motor-readings">
-            <h3>Reported motor positions · 100 Hz</h3>
-            {#each Object.entries(snapshot.encoders) as [port, m]}<span
-                    >{port}<b>{fmt(m.position, 0)}°</b></span
-                >{/each}
-        </div>
+                <div class="motor-readings">
+                    <h3>Reported motor positions · 100 Hz</h3>
+                    {#each Object.entries(snapshot.encoders) as [port, m]}<span
+                            >{port}<b>{fmt(m.position, 0)}°</b></span
+                        >{/each}
+                </div>
+            </div>
+        {/if}
     </aside>
 {/if}
 {#if notice}<div class="toast" role="status">{notice}</div>{/if}
