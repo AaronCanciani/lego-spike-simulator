@@ -1,4 +1,14 @@
 import type { Block, Project } from './engine.ts';
+import type { Attachments } from './attachments.ts';
+export function sensorExampleSetup(kind: 'distance' | 'force' | 'color', attachments: Attachments) {
+    const tools = structuredClone(attachments);
+    // Start with tools out of the probe's way; otherwise an arm can hit the wall first.
+    if (kind === 'force') for (const c of Object.values(tools)) c.initial = c.max;
+    return {
+        start: kind === 'color' ? { x: 0, y: 450, heading: 0 } : { x: 0, y: -100, heading: 180 },
+        attachments: tools
+    };
+}
 // Ordinary Scratch graphs; no privileged simulator controller.
 export function sensorExample(kind: 'distance' | 'force' | 'color'): Project {
     const num = (n: number) => [1, [4, String(n)]];

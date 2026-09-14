@@ -205,7 +205,7 @@ export const wallMission: MissionDefinition = {
     target: { x: 0, y: -481.5 },
     start: { x: 0, y: -330, heading: 12 },
     approach: { x: 0, y: -330, heading: 12 },
-    goal: 'Back into the south wall until both rear corners align, stop, then drive forward at least 100 mm while keeping heading within 3°.',
+    goal: 'Back into the short central wall until both rear corners align, stop, then drive forward at least 100 mm while keeping heading within 3°.',
     skills: 'Wall contact · gyro reset · slip under load',
     route: 'Back up gently; the wall must rotate the chassis physically, not snap its heading. Then drive away.',
     source: archive

@@ -1,0 +1,15 @@
+# Free-drive calibration field
+
+The `practice` field is 23,620 × 11,430 mm: ten times the former width and length (100 times the area). The robot, grid units, sensor ranges, speeds and attachment dimensions are not scaled. Competition boards, the color course and Cargo Harbor retain their existing dimensions.
+
+The field has a pale 500 mm grid, two continuous 40 mm-wide black lines (one 18 m straight line and one 16 m L-shaped line), and five fixed scattered wall pieces. They are deliberately repeatable, not randomized on reset. The central short wall preserves the wall-alignment drill. This is free driving, with no overall mission or victory condition.
+
+`boardSize` / `perimeterWalls` supply the floor bounds and outer walls to rendering and physics. Interior wall pieces come from `obstaclesForBoard`; they collide with the robot and attachments and are visible to distance/force rays. `makePracticeField` supplies the same bounded 4096-pixel-wide raster to the visible mat and color sensing. Pixel-to-world mapping uses the active field dimensions, including reliability-worker sampling. Lines and grid marks remain flat and do not collide.
+
+Top and 3D show the whole field; Robot gives a close-up that follows the robot. Placement spans the enlarged field. Switching to a competition board clamps the starting position back inside that board. The camera's clipping, fog and zoom range change with the field; local shadows follow the robot on the large field.
+
+Gyro feedback and open-loop driving load the same clear runway, starting at (-2000, -3500) mm facing east, at 50% speed for 15 seconds. Their overhead camera frames both the straight path and the default drifting path. The gyro program reads sensed yaw only, not the printed lines or true heading. Default illustrative conditions produce about 4.5 m of travel; this is not a measured hardware result. The line-following example remains on the separate color course and exposes target brightness, steering gain, measured brightness, brightness error and steering correction as native Scratch variables. Its proportional controller and red-marker stopping behavior are unchanged in intent; 50 and -0.9 are course-specific settings, not universal real-robot calibration values.
+
+Sensor demonstrations start near the new lines/central wall. The force demonstration starts with attachments raised so the probe can reach the wall first. The robot showcase now explicitly installs C = rear dozer and D = front lift when selected, even if the prior configuration had no attachments. It does not change the behavior of ordinary program imports. Reload the showcase from Experiments to get that setup; clicking Run on a previously loaded program retains its existing robot configuration.
+
+Regression checks cover field size, unchanged competition dimensions, several metres of native Scratch driving, physical wall contact/sonar, distant black-line readings, camera/placement bounds, all three sensor demonstrations and physical C/D showcase motion. These are simulator behavior checks, not calibration against measured hardware.

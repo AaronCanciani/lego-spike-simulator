@@ -1,11 +1,25 @@
 // Millimeters, world X/Y on the mat; Three/Cannon use (x, height, -y).
 // One definition drives rendering and collision for every perimeter wall.
-export const tableWalls = [
-    { id: 'south', size: [2414, 78, 26], position: [0, 39, 584.5] },
-    { id: 'north', size: [2414, 78, 26], position: [0, 39, -584.5] },
-    { id: 'west', size: [26, 78, 1143], position: [-1194, 39, 0] },
-    { id: 'east', size: [26, 78, 1143], position: [1194, 39, 0] }
-];
+export function boardSize(map = '') {
+    return map === 'practice' ? { width: 23620, height: 11430 } : { width: 2362, height: 1143 };
+}
+export function perimeterWalls(map = '') {
+    const { width, height } = boardSize(map);
+    return [
+        { id: 'south', size: [width + 52, 78, 26], position: [0, 39, height / 2 + 13] },
+        { id: 'north', size: [width + 52, 78, 26], position: [0, 39, -height / 2 - 13] },
+        { id: 'west', size: [26, 78, height], position: [-width / 2 - 13, 39, 0] },
+        { id: 'east', size: [26, 78, height], position: [width / 2 + 13, 39, 0] }
+    ];
+}
+export const tableWalls = perimeterWalls();
+export function clampBoardPosition(x: number, y: number, map = '') {
+    const { width, height } = boardSize(map);
+    return {
+        x: Math.max(-width / 2 + 100, Math.min(width / 2 - 100, x)),
+        y: Math.max(-height / 2 + 100, Math.min(height / 2 - 100, y))
+    };
+}
 export type BoardObstacle = {
     id: string;
     name: string;
@@ -36,6 +50,65 @@ const envelope = (
     source: string
 ): BoardObstacle => ({ id, name, x, y, width, depth, height, color, source });
 export const boardObstacles: Record<string, BoardObstacle[]> = {
+    practice: [
+        // Fixed scattered pieces, so repeated programs see the same environment.
+        // The central piece also preserves the existing short wall-alignment drill.
+        envelope(
+            'practice-south',
+            'Short central wall',
+            0,
+            -584.5,
+            800,
+            26,
+            78,
+            '#477f91',
+            'Original free-drive layout'
+        ),
+        envelope(
+            'practice-east',
+            'Long east wall',
+            2800,
+            1600,
+            60,
+            1800,
+            120,
+            '#c3924d',
+            'Original free-drive layout'
+        ),
+        envelope(
+            'practice-west',
+            'West wall',
+            -3300,
+            -1900,
+            1200,
+            60,
+            100,
+            '#477f91',
+            'Original free-drive layout'
+        ),
+        envelope(
+            'practice-far-east',
+            'Far east wall',
+            6500,
+            -2000,
+            60,
+            2000,
+            160,
+            '#708499',
+            'Original free-drive layout'
+        ),
+        envelope(
+            'practice-far-west',
+            'Far west wall',
+            -7500,
+            2500,
+            2000,
+            60,
+            100,
+            '#c3924d',
+            'Original free-drive layout'
+        )
+    ],
     '2021': [
         envelope(
             'cargo-ship',

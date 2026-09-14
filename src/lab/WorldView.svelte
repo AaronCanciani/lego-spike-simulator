@@ -17,9 +17,28 @@
     let manipulationView: ReturnType<typeof createManipulationView>;
     import { createSensorView } from './sensorView';
     import { makeSensorCourse } from './sensorCourse';
+    import { makePracticeField } from './practiceField';
+    import { boardSize, clampBoardPosition } from './boardGeometry';
     import { drawCargoMap } from './cargoMap';
-    import { createTableWalls, fitBoardCamera } from './boardView';
-    let boardCamera: 'home' | 'top' | null = 'home';
+    import { createTableWalls, fitBoardCamera, fitStraightRunCamera } from './boardView';
+    let boardCamera: 'home' | 'top' | 'drive' | null = 'home';
+    let driveStart = { x: -2000, y: -3500 };
+    function frameBoard(value = map) {
+        if (!camera || !controls || !boardCamera) return;
+        if (boardCamera === 'drive' && value !== 'practice') boardCamera = 'home';
+        controls.target.copy(
+            boardCamera === 'drive'
+                ? fitStraightRunCamera(camera, driveStart)
+                : fitBoardCamera(camera, boardCamera, value)
+        );
+    }
+    export function drivingOverview(start: { x: number; y: number }) {
+        driveStart = { ...start };
+        followRobot = false;
+        boardCamera = 'drive';
+        frameBoard('practice');
+        controls?.update();
+    }
     import type { Reading } from './sensors';
     export let pose = { x: -950, y: -330, heading: 180, yaw: 0 };
     export let path: [number, number][] = [];
@@ -50,6 +69,9 @@
         robot: THREE.Group,
         trail: THREE.Line,
         mat: THREE.Mesh,
+        platform: THREE.Mesh,
+        walls: THREE.Group,
+        light: THREE.DirectionalLight,
         markers: THREE.Group;
     let observer: ResizeObserver,
         frame = 0,
@@ -62,13 +84,13 @@
     export function overhead() {
         followRobot = false;
         boardCamera = 'top';
-        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'top'));
+        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'top', map));
         controls?.update();
     }
     export function home() {
         followRobot = false;
         boardCamera = 'home';
-        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'home'));
+        if (camera && controls) controls.target.copy(fitBoardCamera(camera, 'home', map));
         controls?.update();
     }
     export function robotCloseup() {
@@ -124,6 +146,30 @@
     async function setMap(value: string) {
         loadedMap = value;
         const request = ++loadingId;
+        const size = boardSize(value);
+        mat.scale.set(size.width / WIDTH, size.height / HEIGHT, 1);
+        platform.scale.set((size.width + 95) / (WIDTH + 95), 1, (size.height + 95) / (HEIGHT + 95));
+        if (walls) {
+            scene.remove(walls);
+            walls.traverse((obj) => {
+                const mesh = obj as THREE.Mesh;
+                mesh.geometry?.dispose();
+                if (mesh.material)
+                    (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((m) =>
+                        m.dispose()
+                    );
+            });
+        }
+        walls = createTableWalls(value);
+        scene.add(walls);
+        controls.maxDistance = value === 'practice' ? 70000 : 5000;
+        camera.far = value === 'practice' ? 140000 : 14000;
+        camera.updateProjectionMatrix();
+        scene.fog =
+            value === 'practice'
+                ? new THREE.Fog('#162437', 60000, 120000)
+                : new THREE.Fog('#162437', 4000, 8000);
+        frameBoard(value);
         if (value === 'cargo-harbor') {
             const canvas = document.createElement('canvas');
             canvas.width = 2362;
@@ -132,45 +178,14 @@
             applyTexture(new THREE.CanvasTexture(canvas), canvas);
             return;
         }
-        if (value === 'sensor-course') {
-            const pixels = makeSensorCourse();
+        if (value === 'sensor-course' || value === 'practice') {
+            const pixels = value === 'practice' ? makePracticeField() : makeSensorCourse();
             const c = document.createElement('canvas');
             c.width = pixels.width;
             c.height = pixels.height;
             const image = c.getContext('2d')!.createImageData(c.width, c.height);
             image.data.set(pixels.data);
             c.getContext('2d')!.putImageData(image, 0, 0);
-            applyTexture(new THREE.CanvasTexture(c), c);
-            return;
-        }
-        if (value === 'practice') {
-            const c = document.createElement('canvas');
-            c.width = 1600;
-            c.height = 800;
-            const ctx = c.getContext('2d')!;
-            ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(0, 0, c.width, c.height);
-            ctx.strokeStyle = '#dae2eb';
-            ctx.lineWidth = 2;
-            for (let x = 0; x < c.width; x += 80) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, c.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < c.height; y += 80) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(c.width, y);
-                ctx.stroke();
-            }
-            ctx.strokeStyle = '#202c38';
-            ctx.lineWidth = 18;
-            ctx.strokeRect(230, 180, 1150, 430);
-            ctx.fillStyle = '#2185e5';
-            ctx.fillRect(640, 155, 80, 60);
-            ctx.fillStyle = '#ee3e54';
-            ctx.fillRect(1100, 580, 80, 65);
             applyTexture(new THREE.CanvasTexture(c), c);
             return;
         }
@@ -233,7 +248,7 @@
             controls.maxDistance = 5000;
             home();
             scene.add(new THREE.HemisphereLight(0xe9f4ff, 0x35475d, 2.5));
-            const light = new THREE.DirectionalLight(0xfff5e5, 3.8);
+            light = new THREE.DirectionalLight(0xfff5e5, 3.8);
             light.position.set(-800, 2200, 900);
             light.castShadow = true;
             light.shadow.mapSize.set(2048, 2048);
@@ -247,7 +262,8 @@
             });
             light.shadow.bias = -0.0005;
             scene.add(light);
-            box(0, -48, 0, WIDTH + 95, 72, HEIGHT + 95, '#2d3e52');
+            scene.add(light.target);
+            platform = box(0, -48, 0, WIDTH + 95, 72, HEIGHT + 95, '#2d3e52');
             mat = new THREE.Mesh(
                 new THREE.PlaneGeometry(WIDTH, HEIGHT),
                 new THREE.MeshStandardMaterial({ roughness: 0.95 })
@@ -256,9 +272,8 @@
             mat.position.y = 0;
             mat.receiveShadow = true;
             scene.add(mat);
-            scene.add(createTableWalls());
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(20000, 20000),
+                new THREE.PlaneGeometry(60000, 60000),
                 material('#162437')
             );
             ground.rotation.x = -Math.PI / 2;
@@ -322,13 +337,18 @@
                 renderer.setSize(w, h);
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();
-                if (boardCamera) controls.target.copy(fitBoardCamera(camera, boardCamera));
+                frameBoard();
             });
             observer.observe(host);
             const animate = () => {
                 frame = requestAnimationFrame(animate);
                 robot.position.set(pose.x, 0, -pose.y);
                 robot.rotation.y = (-pose.heading * Math.PI) / 180;
+                // Keep detailed local shadows near the robot throughout the large free-drive field.
+                const lx = map === 'practice' ? pose.x : 0,
+                    lz = map === 'practice' ? -pose.y : 0;
+                light.position.set(lx - 800, 2200, lz + 900);
+                light.target.position.set(lx, 0, lz);
                 cylinder.visible = appearance === 'cylinder';
                 advanced.group.visible =
                     appearance === 'advanced' || (appearance === 'reference' && !reference);
@@ -388,11 +408,7 @@
             camera
         );
         const hit = ray.intersectObject(mat)[0];
-        if (hit)
-            dispatch('place', {
-                x: Math.max(-WIDTH / 2 + 100, Math.min(WIDTH / 2 - 100, hit.point.x)),
-                y: Math.max(-HEIGHT / 2 + 100, Math.min(HEIGHT / 2 - 100, -hit.point.z))
-            });
+        if (hit) dispatch('place', clampBoardPosition(hit.point.x, -hit.point.z, map));
     }
     onDestroy(() => {
         disposed = true;

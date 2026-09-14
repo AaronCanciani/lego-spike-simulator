@@ -16,9 +16,14 @@ export function classifyRgb(r: number, g: number, b: number) {
     else if (b > r && g > r) color = 4;
     return { color, reflection: Math.round(((r * 0.2126 + g * 0.7152 + b * 0.0722) / 255) * 100) };
 }
-export function samplePixels(pixels: Pixels, x: number, y: number) {
-    const px = Math.round((x / 2362 + 0.5) * (pixels.width - 1));
-    const py = Math.round((0.5 - y / 1143) * (pixels.height - 1));
+export function samplePixels(
+    pixels: Pixels,
+    x: number,
+    y: number,
+    bounds = { width: 2362, height: 1143 }
+) {
+    const px = Math.round((x / bounds.width + 0.5) * (pixels.width - 1));
+    const py = Math.round((0.5 - y / bounds.height) * (pixels.height - 1));
     if (px < 0 || py < 0 || px >= pixels.width || py >= pixels.height)
         return { color: -1, reflection: 0 };
     let r = 0,

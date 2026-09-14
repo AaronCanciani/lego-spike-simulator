@@ -150,6 +150,11 @@
                 {/if}
             </details>
         </details>
+    {:else if map === 'practice'}
+        <small
+            >Free drive · 23.62 × 11.43 m · 0.5 m grid · two long black lines · five solid wall
+            pieces. No mission objective.</small
+        >
     {:else if map === 'cargo-harbor'}
         <small>Cargo Harbor uses its separate lift and payload simulation.</small>
     {:else}
@@ -160,7 +165,7 @@
             the obstacles.</small
         >
     {/if}
-    {#if obstaclesForBoard(map).length}
+    {#if map !== 'practice' && obstaclesForBoard(map).length}
         <details class="mission-tools">
             <summary>Static obstacles · model limits</summary>
             <p>

@@ -7,6 +7,27 @@ import { classifyRgb, samplePixels } from './colorSampling.ts';
 import { blocks as definitions } from '../lib/blockly/blocks.ts';
 
 const pixels = makeSensorCourse();
+test('line controller exposes target, measured brightness, error and steering as ordinary named variables', () => {
+    const project = colorExample('line'),
+        target = project.targets[0],
+        blocks = target.blocks;
+    const names = Object.values(target.variables).map((v) => v[0]);
+    for (const name of [
+        'Target brightness',
+        'Steering gain',
+        'Measured brightness',
+        'Brightness error',
+        'Steering correction'
+    ])
+        assert.ok(names.includes(name));
+    assert.equal(blocks.check.inputs.SUBSTACK2[1], 'readBrightness');
+    assert.equal(blocks.readBrightness.next, 'setError');
+    assert.equal(blocks.setError.next, 'setCorrection');
+    assert.equal(blocks.setCorrection.next, 'steer');
+    assert.equal(blocks.steer.inputs.STEERING[1], 'correctionValue');
+    assert.equal(blocks.setTarget.inputs.VALUE[1][1], '50');
+    assert.equal(blocks.setStrength.inputs.VALUE[1][1], '-0.9');
+});
 function trial(kind, options = {}) {
     const profile = structuredClone(defaultProfile);
     profile.seed = options.seed ?? 42;

@@ -1,4 +1,10 @@
 import type { Block, Project } from './engine.ts';
+import { adbAttachments } from './attachments.ts';
+// Loading this hardware showcase installs the hardware its program demonstrates.
+// Keep this separate from ordinary program imports, which preserve the student's robot.
+export function jointShowcaseSetup() {
+    return { start: { x: 0, y: -100, heading: 0 }, attachments: structuredClone(adbAttachments) };
+}
 // Joint showcase is a real Scratch program, not an animation that bypasses motors.
 export function jointExample(): Project {
     const blocks: Record<string, Block> = {};

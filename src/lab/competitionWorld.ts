@@ -15,7 +15,7 @@ import { missionCatalog, type MissionDefinition } from './missionCatalog.ts';
 import type { Pose } from './sensors.ts';
 import { AttachmentPhysics } from './attachmentPhysics.ts';
 import type { Attachments, ToolAppearance } from './attachments.ts';
-import { obstaclesForBoard, tableWalls } from './boardGeometry.ts';
+import { obstaclesForBoard, perimeterWalls, boardSize } from './boardGeometry.ts';
 
 type Motor = { position: number; velocity: number; command: number; target: number | null };
 export type Part = {
@@ -103,8 +103,9 @@ export class CompetitionWorld {
                 contactEquationRelaxation: 4
             })
         );
-        this.solid('floor', [2362, 20, 1143], [0, -10, 0], '#344252', 0, 1);
-        for (const wall of tableWalls)
+        const size = boardSize(options.board);
+        this.solid('floor', [size.width, 20, size.height], [0, -10, 0], '#344252', 0, 1);
+        for (const wall of perimeterWalls(options.board))
             this.solid(wall.id, wall.size, wall.position, '#ced5dc', 0, 1);
         if (options.board)
             for (const obstacle of obstaclesForBoard(options.board)) {
@@ -564,7 +565,10 @@ export class CompetitionWorld {
         } else if (kind === 'wall') {
             const c = this.chassis;
             if (
-                this.touching(c, this.items.get('south')!.body) &&
+                this.touching(
+                    c,
+                    (this.items.get('obstacle-practice-south') ?? this.items.get('south'))!.body
+                ) &&
                 Math.abs(wrap(this.heading)) < 3
             ) {
                 this.wallSquared = true;

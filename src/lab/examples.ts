@@ -2,7 +2,8 @@ import type { Block, Project } from './engine.ts';
 
 // Scratch graphs take exactly the same interpreter path as uploaded projects.
 // The controller reads sensed yaw, never the engine's true heading.
-export function drivingExample(feedback: boolean): Project {
+export const straightRunSetup = { start: { x: -2000, y: -3500, heading: 90 }, seconds: 15 };
+export function drivingExample(feedback: boolean, seconds = 2): Project {
     const num = (value: number) => [1, [4, String(value)]];
     const ref = (id: string) => [2, id];
     const b = (
@@ -35,7 +36,7 @@ export function drivingExample(feedback: boolean): Project {
                 {},
                 'stop'
             ),
-            elapsed: b('operator_gt', { OPERAND1: ref('clock'), OPERAND2: num(2) }),
+            elapsed: b('operator_gt', { OPERAND1: ref('clock'), OPERAND2: num(seconds) }),
             clock: b('flippersensors_timer'),
             correct: b('flippermove_startSteer', { STEERING: ref('gain') }),
             gain: b('operator_multiply', { NUM1: num(3), NUM2: ref('error') }),
@@ -44,7 +45,7 @@ export function drivingExample(feedback: boolean): Project {
         });
     } else {
         blocks.drive = b('flippermove_startSteer', { STEERING: num(0) }, {}, 'wait');
-        blocks.wait = b('control_wait', { DURATION: num(2) }, {}, 'stop');
+        blocks.wait = b('control_wait', { DURATION: num(seconds) }, {}, 'stop');
     }
     for (const [id, block] of Object.entries(blocks)) {
         if (block.next) blocks[block.next].parent = id;

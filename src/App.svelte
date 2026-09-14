@@ -171,12 +171,13 @@
         settingsTab = value;
         settingsDrawer?.scrollTo({ top: 0 });
     }
-    import { drivingExample } from './lab/examples';
-    import { sensorExample } from './lab/sensorExamples';
+    import { drivingExample, straightRunSetup } from './lab/examples';
+    import { sensorExample, sensorExampleSetup } from './lab/sensorExamples';
     import { colorExample, resultVariable, type ColorExperiment } from './lab/colorExamples';
     import { samplePixels } from './lab/colorSampling';
+    import { boardSize, clampBoardPosition } from './lab/boardGeometry';
     import { courseStart } from './lab/sensorCourse';
-    import { jointExample } from './lab/jointExample';
+    import { jointExample, jointShowcaseSetup } from './lab/jointExample';
     import { liftExample } from './lab/liftExample';
     import { liftStart, defaultLift } from './lab/manipulation';
     import { cargoMissionMap } from './lab/cargoMap';
@@ -470,7 +471,7 @@
     }
     function sampleColor(x: number, y: number) {
         if (!mapPixels || !mapCanvas) return { color: 10, reflection: 90 };
-        return samplePixels(mapPixels, x, y);
+        return samplePixels(mapPixels, x, y, boardSize(map));
     }
     function reset() {
         cancelTrials(true);
@@ -554,7 +555,20 @@
         loading = true;
         try {
             if (publicRelease) {
-                accept(drivingExample(true), 'Gyro feedback · 2 seconds');
+                selectedMission = '';
+                mission = false;
+                liftEnabled = false;
+                start = { ...straightRunSetup.start };
+                if (map !== 'practice') {
+                    map = 'practice';
+                    mapReady = false;
+                }
+                accept(
+                    drivingExample(true, straightRunSetup.seconds),
+                    'Gyro feedback · 15-second straight run'
+                );
+                showTrail = true;
+                world?.drivingOverview(start);
                 return;
             }
             const response = await fetch(assetUrl('samples/new-code-blocks.json'));
@@ -618,7 +632,9 @@
             return;
         }
         if (example === 'joints') {
-            start = { x: 0, y: -100, heading: 0 };
+            const setup = jointShowcaseSetup();
+            start = setup.start;
+            attachments = setup.attachments;
             if (map !== 'practice') {
                 map = 'practice';
                 mapReady = false;
@@ -628,7 +644,7 @@
             accept(jointExample(), 'Robot showcase · wheels & tools');
             world?.robotCloseup();
             announce(
-                'Real motor commands: drive forward/back, raise C/D tools, then lower them. Geometry is an ADB-style approximation.'
+                'Showcase loaded with the rear dozer on C and front lift on D. Drive forward/back, raise both tools, then lower them.'
             );
             example = '';
             return;
@@ -664,7 +680,9 @@
                 side: 0,
                 height: kind === 'color' ? 8 : 35
             };
-            start = { x: 0, y: kind === 'color' ? -350 : -400, heading: 0 };
+            const setup = sensorExampleSetup(kind, attachments);
+            start = setup.start;
+            attachments = setup.attachments;
             if (map !== 'practice') {
                 map = 'practice';
                 mapReady = false;
@@ -680,7 +698,9 @@
                       : 'Force · stop on probe contact'
             );
             announce(
-                'Port B is configured for this experiment. Sensor mounts and noise remain adjustable.'
+                kind === 'force'
+                    ? 'Port B is configured for touch. Attachments start raised so the probe can reach the wall.'
+                    : 'Port B is configured for this experiment. Sensor mounts and noise remain adjustable.'
             );
             example = '';
             return;
@@ -704,17 +724,23 @@
             example = '';
             return;
         }
-        start = { x: 0, y: -400, heading: 0 };
+        start = { ...straightRunSetup.start };
         if (map !== 'practice') {
             map = 'practice';
             mapReady = false;
         }
         lastFile = null;
         accept(
-            drivingExample(example === 'gyro'),
-            example === 'gyro' ? 'Gyro feedback · 2 seconds' : 'Open loop · 2 seconds'
+            drivingExample(example === 'gyro', straightRunSetup.seconds),
+            example === 'gyro'
+                ? 'Gyro feedback · 15-second straight run'
+                : 'Open loop · 15-second straight run'
         );
-        announce('Same speed and duration. Compare the trail; try increasing wheel mismatch.');
+        showTrail = true;
+        world?.drivingOverview(start);
+        announce(
+            '15-second run on the large free-drive field. Gyro feedback corrects heading, not the printed line. Open loop uses the same start, speed and duration.'
+        );
         example = '';
     }
     function toggle() {
@@ -771,6 +797,7 @@
     function selectMap() {
         selectedMission = '';
         practiceApproach = false;
+        start = { ...start, ...clampBoardPosition(start.x, start.y, map) };
         if (map !== 'cargo-harbor') liftEnabled = false;
         if (map !== '2024') mission = false;
         if (map === 'cargo-harbor') {
@@ -1155,8 +1182,8 @@
                     >{#each archivedMaps as field}<option value={field.id}
                             >{field.name} · {field.id}</option
                         >{/each}<option value="cargo-harbor">Cargo Harbor · delivery mission</option
-                    ><option value="practice">Calibration grid</option><option value="sensor-course"
-                        >Color & line course</option
+                    ><option value="practice">Free-drive calibration grid · 10×</option><option
+                        value="sensor-course">Color & line course</option
                     ></select
                 >
             </div>

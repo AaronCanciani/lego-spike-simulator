@@ -31,7 +31,7 @@ test('every archived map loads physical obstacles without selecting an objective
         );
         for (const wall of tableWalls) assert.equal(w.items.get(wall.id).body.mass, 0);
     }
-    assert.equal(engine('practice').competition.snapshot().parts.length, 0);
+    assert.equal(engine('practice').competition.snapshot().parts.length, 5);
 });
 test('perimeter meshes exactly match collision dimensions and wall tops at 78 mm', () => {
     const w = engine('2024').competition,
